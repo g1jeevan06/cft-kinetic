@@ -62,7 +62,7 @@
   /* Title screen: wordmark top left, links top right, everything else in one column at the bottom left. */
   .title-foot { display: flex; gap: clamp(28px, 7vw, 96px); align-items: flex-end; justify-content: flex-start; flex-wrap: wrap; }
   /* The links sit over the bright sky, so they get their own dark plate to stay readable. */
-  #title > .cft-links { position: absolute; top: clamp(20px, 4vw, 48px); right: clamp(20px, 4vw, 48px); width: min(700px, 52vw); margin: 0;
+  #title > .cft-links { position: absolute; top: clamp(20px, 4vw, 48px); right: clamp(20px, 4vw, 48px); width: min(860px, 60vw); margin: 0;
     padding: 8px; background: rgba(6, 5, 3, 0.62); backdrop-filter: blur(8px); border: 1px solid var(--rule-2); }
   .title-controls .specline:first-child { margin-top: 0; }
   .title-controls .specline.byline { margin-bottom: 22px; }
@@ -453,10 +453,12 @@
 
   /* Craftech360 links */
   /* Four equal chips that wrap in step (4 → 2 → 1 across), so the row never leaves one link stranded. */
-  .cft-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 18px 0 0; padding: 0; }
-  .cft-link { display: flex; flex-direction: column; gap: 3px; padding: 9px 13px; border: 1px solid var(--rule); color: var(--ink); text-decoration: none; font: 13px var(--body); background: rgba(254, 204, 0, 0.05); clip-path: var(--cut-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Wrapping flex, not a fixed grid: the chips appear in several places at different widths, and with a fixed
+     column count the last one strands in a narrow box of its own whenever a link is added or removed. Here the
+     chips on the final row grow to fill it, so any number of links looks deliberate. */
+  .cft-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; }
+  .cft-link { flex: 1 1 146px; display: flex; flex-direction: column; gap: 3px; padding: 9px 13px; border: 1px solid var(--rule); color: var(--ink); text-decoration: none; font: 13px var(--body); background: rgba(254, 204, 0, 0.05); clip-path: var(--cut-s); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cft-link span { font: 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--signal); }
-  @media (max-width: 760px) { .cft-links { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .cft-link:hover { background: rgba(254, 204, 0, 0.18); }
   #title .cft-link, .exit-inner .cft-link { color: var(--hud-text); }
   /* Pause console */
@@ -480,7 +482,7 @@
   /* In the pause console the "Craftech360" label sits on its own line above the four chips, not inline with
      them — inline it pushed the last link onto a second row on its own. */
   .pause-sheet > .cft-links { margin: 0; padding: 14px 28px 18px; border-top: 1px solid var(--rule-2); }
-  .pause-sheet > .cft-links::before { content: "Craftech360"; grid-column: 1 / -1; font: 11px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
+  .pause-sheet > .cft-links::before { content: "Craftech360"; flex-basis: 100%; font: 11px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 2px; }
   @media (max-width: 760px) { .pause-grid { grid-template-columns: 1fr; } .pause-menu { border-right: 0; } .pause-stats { display: none; } }
 
   @media (prefers-reduced-motion: reduce) {
@@ -1009,7 +1011,8 @@ CFT.LINKS = [
   { label: 'Website', text: 'craftech360.com', url: 'https://www.craftech360.com/' },
   { label: 'Instagram', text: '@craftech360', url: 'https://www.instagram.com/craftech360/?hl=en' },
   { label: 'YouTube', text: '@craftech_360', url: 'https://www.youtube.com/@craftech_360' },
-  { label: 'Google', text: 'Craftech360 on Google', url: 'https://share.google/PkuknnBfwudsUQCuU' }
+  { label: 'Google', text: 'Craftech360 on Google', url: 'https://share.google/PkuknnBfwudsUQCuU' },
+  { label: 'Demo', text: 'demo.craftech360.com', url: 'https://demo.craftech360.com/' }
 ];
 
 // Overall sizes in mm read off the team's line drawings (3D_linedaigram\UPDATED on the NAS): the floor
