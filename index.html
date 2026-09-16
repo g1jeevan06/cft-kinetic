@@ -1,3 +1,6 @@
+<!-- Must stay in the first 1024 bytes, or the browser ignores it. GitHub Pages sends charset=utf-8 in the
+     header, but a copy opened straight from disk has no header, and the ·, × and — in the text break. -->
+<meta charset="utf-8">
 <title>CFT Kinetic Museum</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,6 +48,10 @@
   .wordmark { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 7vw, 92px); line-height: 1.04; letter-spacing: -0.01em; margin: 18px 0 0; }
   .wordmark .brand { display: block; height: clamp(56px, 7vw, 96px); width: auto; margin-bottom: 0.3em; }
   .title-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  /* Shown while the installations' models are still arriving; the start buttons wait for them. */
+  #halls-wait { flex-basis: 100%; margin: 0; font: 12px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--hud-dim); font-variant-numeric: tabular-nums; }
+  #halls-count { margin-left: 8px; color: var(--signal); }
+  .title-actions .btn[disabled] { opacity: 0.45; cursor: progress; }
   /* The start button sits out in the open plaza on the right, away from the wordmark column. */
   #title > .title-actions { position: absolute; left: 62%; bottom: 16%; }
   #title > .title-actions .btn { padding: 17px 30px; font-size: 15px; }
@@ -498,6 +505,7 @@
   <div class="title-actions">
     <button class="btn btn-white btn-animated" id="btn-start">Begin the visit</button>
     <button class="btn" id="btn-continue" hidden>Continue tour</button>
+    <p id="halls-wait" hidden>Preparing the halls&hellip;<span id="halls-count"></span></p>
   </div>
   <div class="title-foot">
     <div class="title-controls">
@@ -1163,7 +1171,8 @@ const loadScript = src => new Promise((res, rej) => {
   const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src));
   document.head.appendChild(s);
 });
-CFT.loadModels = () => {
+// onProgress(done, total) is called as each one lands, for the title screen's "Preparing the halls" line.
+CFT.loadModels = onProgress => {
   const data = CFT.MODEL_DATA || {}, urls = CFT.MODEL_URLS || {};
   const videos = CFT.VIDEO_SCRIPT ? loadScript(CFT.VIDEO_SCRIPT).catch(err => console.warn(err)) : Promise.resolve();
   if (!THREE.GLTFLoader) return videos;
@@ -1171,7 +1180,9 @@ CFT.loadModels = () => {
   if (window.MeshoptDecoder) loader.setMeshoptDecoder(MeshoptDecoder); // models are gltfpack-compressed
   if (window.createImageBitmap) loader.register(parser => { parser.textureLoader = textureBytesLoader; return { name: 'CFT_texture_bytes' }; });
   const ids = Object.keys(data).concat(Object.keys(urls).filter(id => !data[id]));
-  return Promise.all([videos].concat(ids.map(id => new Promise(done => {
+  let landed = 0;
+  return Promise.all([videos].concat(ids.map(id => new Promise(settle => {
+    const done = () => { if (onProgress) onProgress(++landed, ids.length); settle(); };
     const fail = err => { console.warn(`Model "${id}" could not be loaded; using the built-in version.`, err); done(); };
     const ok = gltf => { CFT.MODELS[id] = gltf; done(); };
     // Online the host serves only web file types, so each .glb arrives wrapped as { "glb": base64 } in a .json file.
@@ -2796,6 +2807,9 @@ CFT.loadModels = () => {
     const discs = new T.InstancedMesh(discGeo, new T.MeshBasicMaterial({ color: 0xFFE7C4, toneMapped: false }), D.discs.length);
     D.discs.forEach((p, i) => { m4.compose(v.set(p.x, p.y, p.z), q.identity(), s.set(1, 1, 1)); discs.setMatrixAt(i, m4); });
     [pools, scal, discs].forEach(m => { m.frustumCulled = false; scene.add(m); });
+    // Emptied so a second pass builds only its own decals: the installations are built later, once their
+    // models have arrived, and add downlights and wall washes of their own.
+    D.pools = []; D.scallops = []; D.discs = [];
   }
 
   // ---------------------------------------------------------------- Building pieces
@@ -3553,6 +3567,10 @@ CFT.loadModels = () => {
     });
     world.floorMats.push(M.floor);
 
+    // The installations are the whole download: the team's twelve models are ~45 MB against ~6 MB for
+    // everything else. They are built in a second pass, called once those models have arrived, so the title
+    // screen (which looks at the building from outside) comes up without waiting for them.
+    world.buildExhibits = () => {
     CFT.EXHIBITS.forEach((data, i) => {
       const accent = new T.Color(data.accent), r = ROOMS.find(x => x.id === data.id);
       const built = CFT.EXHIBIT_BUILDERS[data.id]({ accent });
@@ -3590,12 +3608,22 @@ CFT.loadModels = () => {
       world.exhibits.push(ex);
     });
 
-    ROOMS.forEach(r => {
-      buildRoomShell(A, M, D, scene, r);
-      if (r.exhibit) {
+      ROOMS.forEach(r => {
+        if (!r.exhibit) return;
         roomSign(scene, r, r.exhibit.index + 1, r.exhibit.data.name, r.exhibit.data.accent);
         buildExhibitRoom(A, M, D, scene, world, r, r.exhibit);
-      } else if (r.type === 'cafe') { roomSign(scene, r, 0, 'Café', '#E0B366'); buildCafe(A, M, D, scene, world, r); }
+      });
+      A.build(scene);
+      buildDecals(scene, TX, D);
+      world.buildExhibits = () => {};   // once only
+    };
+
+    // Everything from here on draws without a single model, so it runs straight away.
+    const hasExhibit = r => CFT.EXHIBITS.some(d => d.id === r.id);
+    ROOMS.forEach(r => {
+      buildRoomShell(A, M, D, scene, r);
+      if (hasExhibit(r)) return;
+      if (r.type === 'cafe') { roomSign(scene, r, 0, 'Café', '#E0B366'); buildCafe(A, M, D, scene, world, r); }
       else roomSign(scene, r, 0, 'Restrooms', '#9AA4AD');
     });
     buildLobby(A, M, D, scene, world);
@@ -4481,9 +4509,11 @@ CFT.loadModels = () => {
   function updateProgress() {
     const P = G().state.progress;
     $('progress-count').textContent = `${G().requiredVisited()}/${G().REQ.length}`;
+    // Read from CFT.EXHIBITS, not the built world: the HUD is drawn before the installations are built.
     $('progress-ticks').innerHTML = CFT.ROUTE.map(id => {
-      const e = byId(id);
-      return `<span class="${P.visited[e.index] ? 'on' : ''}" style="--hall:${e.data.accent}" title="${e.data.name}"></span>`;
+      const i = CFT.EXHIBITS.findIndex(e => e.id === id), d = CFT.EXHIBITS[i];
+      if (!d) return '';
+      return `<span class="${P.visited[i] ? 'on' : ''}" style="--hall:${d.accent}" title="${d.name}"></span>`;
     }).join('');
   }
   function onKey(e) {
@@ -5311,9 +5341,20 @@ CFT.loadModels = () => {
   }
 
   // ---------------------------------------------------------------- Title, restart
+  // The halls are built after the title screen is already up (see boot), so both start buttons wait until
+  // their models have landed. The visitor reads the controls instead of watching a black loading screen.
+  let hallsBuilt = false;
+  function setHallProgress(done, total) { $('halls-count').textContent = `${done}/${total}`; }
+  function hallsReady() { hallsBuilt = true; gateStart(); }
+  function gateStart() {
+    $('btn-start').disabled = !hallsBuilt;
+    $('btn-continue').disabled = !hallsBuilt;
+    $('halls-wait').hidden = hallsBuilt;
+  }
   function showTitle() {
     G.setPhase('title');
     $('title').hidden = false; $('hud').hidden = true;
+    gateStart();
     const s = readSave();
     const hasRun = s && s.progress && (s.progress.welcomed || (s.progress.visited || []).some(Boolean));
     $('btn-continue').hidden = !hasRun;
@@ -5428,8 +5469,11 @@ CFT.loadModels = () => {
     }
   }
   (async function boot() {
-    await Promise.all([loadFonts(), CFT.loadLogos(), CFT.loadPhotos(), CFT.loadModels()]);
-    $('loading-text').textContent = 'Polishing the marble and hanging the installations…';
+    await Promise.all([loadFonts(), CFT.loadLogos(), CFT.loadPhotos()]);
+    // The installations start downloading now but are not waited for here: the hall the visitor sees first is
+    // the building from outside, which needs no model at all. They are hung further down, once they land.
+    const models = CFT.loadModels(setHallProgress);
+    $('loading-text').textContent = 'Polishing the marble…';
     await new Promise(r => requestAnimationFrame(() => setTimeout(r, 30)));
     try {
       G.world = CFT.buildWorld(renderer, scene);
@@ -5448,6 +5492,16 @@ CFT.loadModels = () => {
     $('loading').hidden = true;
     showTitle();
     requestAnimationFrame(frame);
+    await models;
+    try {
+      G.world.buildExhibits();
+      renderer.compile(scene, camera);   // the new materials, compiled before they are first drawn
+    } catch (err) {
+      console.warn('The installations could not be built.', err);
+    }
+    resetExhibits();
+    UI().updateProgress();
+    hallsReady();
   })();
 })();
 
