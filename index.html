@@ -2493,8 +2493,10 @@ CFT.loadModels = onProgress => {
       video = CFT.screenVideo ? CFT.screenVideo(id) : null;
       patTex = screenTexture(o.accent);
       if (video) { videoTex = new T.VideoTexture(video); videoTex.encoding = T.sRGBEncoding; }
-      pattern = video ? 'video' : 'wave';
-      screenM = ledMaterial(videoTex || patTex);
+      // The Craftech360 logo is what every installation rests on. Its own video and the other patterns are
+      // one chip, or the P key, away.
+      pattern = 'logo';
+      screenM = ledMaterial(patTex);
       screenMeshes.forEach(m => { m.material = screenM; });
       lay = screenUVs(model, screenMeshes);
       patTex.aspect = lay.w / (lay.h || 1);
@@ -2526,6 +2528,9 @@ CFT.loadModels = onProgress => {
       group: g, radius: Math.max(1.3, Math.max(s.x, s.z) / 2 + 0.5),
       size: { w: s.x + basePad * 2, h: o.hang ? CEIL : (o.keepHeight ? box.max.y : s.y) + 0.14 + baseH, d: s.z + basePad * 2 },
       patterns: screenM ? (video ? ['video'] : []).concat(PATTERNS) : null,
+      // What is actually on the screens right now, so the panel's chips and the P key start from it instead
+      // of assuming the first entry in the list.
+      patternId: pattern,
       setPattern: screenM ? setPattern : null,
       setCustom: screenM ? setCustom : null,
       update(dt, e) {
