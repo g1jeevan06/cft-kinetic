@@ -2776,6 +2776,8 @@ CFT.loadModels = onProgress => {
       hallFloor: std({ map: TX.floorLight, color: 0xF0F2F4, roughness: 0.35, metalness: 0.1, envMapIntensity: 0.8 }),
       hexFloor: std({ map: TX.hex, roughness: 0.2, metalness: 0.3, envMapIntensity: 1.1 }),
       redLine: std({ color: 0xB3262B, roughness: 0.5 }),
+      // The installations' round plinths keep the dark gunmetal plate finish they had before the sea-station look.
+      plinth: std({ map: TX.tech, roughness: 0.38, metalness: 0.55, envMapIntensity: 0.8 }),
       grass: std({ color: 0x4F9A2B, roughness: 1 }),
       // Cool light lines (the atrium's glowing floor ring). Names kept from the warm/gold scheme they replace.
       glowWarm: new T.MeshBasicMaterial({ color: 0xF2FAFF, toneMapped: false }),
@@ -2974,7 +2976,7 @@ CFT.loadModels = onProgress => {
     [s1, s2].forEach(w => [0.3, 0.62].forEach(t => { const p = along(w, t); scallop(D, p[0], p[1], w.n[0], w.n[1], { k: 0.32 }); }));
     const hangs = ex.size.h >= 6, ceilY = hangs ? TOP : TOP - 0.4;   // dropped ceiling height (open over hanging installations)
     [[-3.3, -3.3], [3.3, -3.3], [-3.3, 3.3], [3.3, 3.3]].forEach(([a, b]) => downlight(D, r.cx + a, r.cz + b, { size: 2.4, k: 0.24, y: ceilY }));
-    A.add(new T.RingGeometry(ex.radius + 0.42, ex.radius + 0.48, 8, 1, Math.PI / 8), M.redLine, r.cx, FLOOR + 0.012, r.cz, 0, -Math.PI / 2);
+    A.add(new T.RingGeometry(ex.radius + 0.42, ex.radius + 0.48, 128), M.redLine, r.cx, FLOOR + 0.012, r.cz, 0, -Math.PI / 2);
     // Station floor (the grey lab reference): pale tiles over the whole hall, a red safety line inset from the
     // walls, and dark hatch strips either side of the doorway.
     A.add(Geo.planeUV(r.x1 - r.x0 - 0.2, r.z1 - r.z0 - 0.2, 2.4), M.hallFloor, r.cx, FLOOR + 0.008, r.cz, 0, -Math.PI / 2);
@@ -3835,11 +3837,11 @@ CFT.loadModels = onProgress => {
         });
         ex.stage = { w: sw, d: sd };
       } else {
-        // Octagonal plinth, like the octagonal core of the station reference render.
-        const plinth = new T.Mesh(new T.CylinderGeometry(ex.radius, ex.radius + 0.05, 0.14, 8), M.white);
-        plinth.rotation.y = Math.PI / 8; plinth.position.y = 0.07; plinth.receiveShadow = true; ex.group.add(plinth);
-        const edge = new T.Mesh(new T.TorusGeometry(ex.radius + 0.02, 0.022, 6, 8), edgeMat);
-        edge.rotation.set(Math.PI / 2, 0, Math.PI / 8); edge.position.y = 0.14; ex.group.add(edge);
+        // Round dark plinth (the user asked for the round bases back after trying octagonal white ones).
+        const plinth = new T.Mesh(new T.CylinderGeometry(ex.radius, ex.radius + 0.05, 0.14, 96), M.plinth);
+        plinth.position.y = 0.07; plinth.receiveShadow = true; ex.group.add(plinth);
+        const edge = new T.Mesh(new T.TorusGeometry(ex.radius + 0.02, 0.022, 6, 128), edgeMat);
+        edge.rotation.x = Math.PI / 2; edge.position.y = 0.14; ex.group.add(edge);
       }
       ex.edgeMat = edgeMat;
       ex.pos = V(r.cx, FLOOR, r.cz);
