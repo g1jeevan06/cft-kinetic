@@ -3242,7 +3242,7 @@ CFT.loadModels = onProgress => {
     D.pools.push({ x: 0, y: FLOOR + 0.012, z: 0, s: 5.5, c: WARM.clone().multiplyScalar(0.2) });
     world.anchors.push({ pos: V(0, GY, 0), color: new T.Color(0x9FD8FF), base: 0.7, range: 12 });
     world.colliders.push({ x: 0, z: 0, r: 2.55 });
-    world.kiosks.push({ id: 'desk', label: 'Lobby Globe', verb: 'Choose your route', pos: V(0, FLOOR + 1, 0), radius: 4.6 });
+    world.kiosks.push({ id: 'desk', label: 'Lobby Globe', verb: 'Choose your route', pos: V(0, FLOOR + 1, 0), radius: 7.8 });
   }
   function buildLounge(A, M, D, world, x, z) {
     A.add(new T.PlaneGeometry(5, 3.4), M.fabric, x, FLOOR + 0.008, z, 0, -Math.PI / 2);
@@ -3319,31 +3319,36 @@ CFT.loadModels = onProgress => {
     // Daylight falling through the dome.
     world.anchors.push({ pos: V(0, TOP + 3, 0), color: new T.Color(0xF2F8FF), base: 1.3, range: 24 });
   }
-  // Atrium garden (the white-atrium reference): clusters of three round white planters with grass, one small
-  // tree in each cluster, and café tables with glass tops, all between the globe and the hexagon band.
+  // Atrium garden (the user's top-down plan: a green island in the middle of the lobby): a raised round bed
+  // between two white walls around the globe, with grass, palms, shrubs and small uplights, and café tables round it.
   function buildAtriumGarden(A, M, D, world) {
-    const R = 6.6;
-    const planter = (x, z, r) => {
-      A.add(new T.CylinderGeometry(r, r - 0.06, 0.34, 40), M.white, x, FLOOR + 0.17, z);
-      A.add(new T.TorusGeometry(r - 0.06, 0.08, 10, 48), M.white, x, FLOOR + 0.34, z, 0, Math.PI / 2);
-      A.add(new T.CircleGeometry(r - 0.12, 40), M.grass, x, FLOOR + 0.33, z, 0, -Math.PI / 2);
-      for (let k = 0; k < 7; k++) {
-        const a = k * 2.4, d = (r - 0.3) * Math.sqrt((k + 0.5) / 7);
-        A.add(new T.IcosahedronGeometry(0.16, 0), M.leaf, x + Math.cos(a) * d, FLOOR + 0.38, z + Math.sin(a) * d, a);
+    const RI = 2.75, RO = 6.0, H = 0.5, R = 7.5;
+    A.add(new T.CylinderGeometry(RO, RO, H, 96, 1, true), M.white, 0, FLOOR + H / 2, 0);
+    A.add(new T.CylinderGeometry(RI, RI, H, 64, 1, true), M.white, 0, FLOOR + H / 2, 0);
+    A.add(new T.TorusGeometry(RO, 0.12, 10, 160), M.white, 0, FLOOR + H, 0, 0, Math.PI / 2);
+    A.add(new T.TorusGeometry(RI, 0.1, 10, 96), M.white, 0, FLOOR + H, 0, 0, Math.PI / 2);
+    A.add(new T.TorusGeometry(RO + 0.14, 0.03, 6, 160), M.glowGold, 0, FLOOR + 0.03, 0, 0, Math.PI / 2);
+    A.add(new T.RingGeometry(RI, RO, 96, 1), M.grass, 0, FLOOR + H - 0.04, 0, 0, -Math.PI / 2);
+    // Shrubs all round the bed.
+    for (let k = 0; k < 46; k++) {
+      const a = k * 2.399, r = RI + 0.4 + (k * 0.618 % 1) * (RO - RI - 0.8), sz = 0.22 + (k % 4) * 0.07;
+      A.add(new T.IcosahedronGeometry(sz, 0), M.leaf, Math.sin(a) * r, FLOOR + H + sz * 0.6, Math.cos(a) * r, a);
+    }
+    // Palms: a leaning trunk and a crown of drooping fronds that fan outwards (away from the globe).
+    for (let i = 0; i < 7; i++) {
+      const a = i / 7 * Math.PI * 2 + 0.3, r = 4.4 + (i % 2) * 0.6, x = Math.sin(a) * r, z = Math.cos(a) * r, h = 3.6 + (i % 3) * 0.7;
+      const trunk = new T.CylinderGeometry(0.11, 0.2, h, 8); trunk.translate(0, h / 2, 0); trunk.rotateX(0.12); trunk.rotateY(a);
+      A.add(trunk, M.bark, x, FLOOR + H, z);
+      const tx = x + Math.sin(a) * Math.sin(0.12) * h, tz = z + Math.cos(a) * Math.sin(0.12) * h, ty = FLOOR + H + h * Math.cos(0.12);
+      for (let k = 0; k < 9; k++) {
+        const b = a + (k / 8 - 0.5) * 3.6, frond = new T.BoxGeometry(2.2, 0.04, 0.42);
+        frond.translate(1.1, 0, 0); frond.rotateZ(-0.5 - (k % 3) * 0.12); frond.rotateY(b - Math.PI / 2);
+        A.add(frond, M.leaf, tx, ty, tz);
       }
-    };
-    [1, 3, 5, 7].forEach(q => {
-      const a = q * Math.PI / 4, cx = Math.sin(a) * R, cz = Math.cos(a) * R;
-      [0, 1, 2].forEach(k => { const b = a + k * Math.PI * 2 / 3; planter(cx + Math.sin(b) * 0.95, cz + Math.cos(b) * 0.95, 0.72); });
-      // The small tree stands in the planter nearest the globe.
-      const tx = cx + Math.sin(a + Math.PI) * 0.95, tz = cz + Math.cos(a + Math.PI) * 0.95;
-      A.add(new T.CylinderGeometry(0.06, 0.1, 1.9, 8), M.bark, tx, FLOOR + 1.3, tz);
-      for (let k = 0; k < 7; k++) {
-        const b = k * 0.9, rr = 0.3 + (k % 3) * 0.2;
-        A.add(new T.IcosahedronGeometry(0.55 - (k % 3) * 0.1, 1), M.leaf, tx + Math.cos(b) * rr, FLOOR + 2.3 + (k % 3) * 0.3, tz + Math.sin(b) * rr, b, b);
-      }
-      world.colliders.push({ x: cx, z: cz, r: 1.75 });
-    });
+      A.add(new T.CylinderGeometry(0.1, 0.1, 0.05, 12), M.glowWarm, Math.sin(a) * (r + 0.7), FLOOR + H + 0.01, Math.cos(a) * (r + 0.7));
+      D.pools.push({ x, y: FLOOR + H + 0.02, z, s: 2.2, c: new T.Color(0xDCEBFF).multiplyScalar(0.22) });
+    }
+    world.colliders.push({ x: 0, z: 0, r: RO + 0.1 });
     // Café tables on the three sides away from the entrance axis.
     [[R, 0], [-R, 0], [0, -R]].forEach(([x, z]) => {
       A.add(new T.CylinderGeometry(0.55, 0.55, 0.03, 40), M.glass, x, FLOOR + 0.74, z);
@@ -3696,6 +3701,19 @@ CFT.loadModels = onProgress => {
   // circling overhead and more stations far off in the haze.
   const SEA = { cx: 0, cz: 15, R: 88, water: -11 };   // the deck is raised well above the sea on legs
   SEA.apo = SEA.R * Math.cos(Math.PI / 8);
+  // Four bridges, two off each side of the deck (z = cz ± 22), each to a satellite station of radius SR at x = ±SX.
+  SEA.SR = 16; SEA.SX = SEA.apo + 58 + SEA.SR; SEA.BZ = [-22, 22]; SEA.BW = 5;
+  // On a bridge, or on a satellite station's deck outside its domed drum.
+  const onBridge = (x, z) => {
+    const ax = Math.abs(x - SEA.cx);
+    for (const dz of SEA.BZ) {
+      const bz = SEA.cz + dz;
+      if (Math.abs(z - bz) < SEA.BW / 2 - 0.45 && ax > SEA.apo - 1.5 && ax < SEA.SX - SEA.SR + 1.5) return true;
+      const d = Math.hypot(ax - SEA.SX, z - bz);
+      if (d < SEA.SR * Math.cos(Math.PI / 8) - 0.9 && d > SEA.SR * 0.55) return true;
+    }
+    return false;
+  };
   // Inside the deck's octagon (flat sides facing the four axes), m metres in from its edge.
   const onDeck = (x, z, m) => {
     const dx = Math.abs(x - SEA.cx), dz = Math.abs(z - SEA.cz), a = SEA.apo - m;
@@ -3739,8 +3757,17 @@ CFT.loadModels = onProgress => {
       const [x0, z0] = oct(k), [x1, z1] = oct(k + 1), L = Math.hypot(x1 - x0, z1 - z0), ry = Math.atan2(-(z1 - z0), x1 - x0);
       const nx = (x0 + x1) / 2 - cx, nz = (z0 + z1) / 2 - cz, nl = Math.hypot(nx, nz), ix = -nx / nl * 0.6, iz = -nz / nl * 0.6;
       const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
-      A.box(M.glass, L - 1, 1.1, 0.04, mx + ix, 0.6, mz + iz, ry);
-      A.box(M.white, L - 1, 0.07, 0.1, mx + ix, 1.18, mz + iz, ry);
+      if (Math.abs(nx / nl) > 0.99) {
+        // East and west sides: the rail runs in three pieces, open where the two bridges join.
+        const z0s = mz - L / 2 + 0.5, z1s = mz + L / 2 - 0.5, gaps = SEA.BZ.map(dz => cz + dz).sort((a, b) => a - b), hw = SEA.BW / 2 + 0.2;
+        [[z0s, gaps[0] - hw], [gaps[0] + hw, gaps[1] - hw], [gaps[1] + hw, z1s]].forEach(([a, b]) => {
+          A.box(M.glass, 0.04, 1.1, b - a, mx + ix, 0.6, (a + b) / 2);
+          A.box(M.white, 0.1, 0.07, b - a, mx + ix, 1.18, (a + b) / 2);
+        });
+      } else {
+        A.box(M.glass, L - 1, 1.1, 0.04, mx + ix, 0.6, mz + iz, ry);
+        A.box(M.white, L - 1, 0.07, 0.1, mx + ix, 1.18, mz + iz, ry);
+      }
       A.box(M.glowGold, L, 0.05, 0.05, mx, -0.05, mz, ry);
       for (let t = 0.1; t < 1; t += 0.2) A.box(M.white, 0.08, 1.1, 0.08, x0 + (x1 - x0) * t + ix, 0.6, z0 + (z1 - z0) * t + iz);
     }
@@ -3805,8 +3832,8 @@ CFT.loadModels = onProgress => {
         const h = new T.Mesh(new T.PlaneGeometry(8, 8), wHalo); h.rotation.x = -Math.PI / 2; h.position.set(lx + Math.sin(b) * 4, SEA.water + 0.05, lz + Math.cos(b) * 4); scene.add(h);
       }
     };
-    const apo = SEA.apo, SR = 16, SX = apo + 58 + SR;
-    [-1, 1].forEach(side => [-22, 22].forEach(dz => {
+    const apo = SEA.apo, SR = SEA.SR, SX = SEA.SX;
+    [-1, 1].forEach(side => SEA.BZ.forEach(dz => {
       const z = cz + dz, x0 = cx + side * (apo - 0.5), x1 = cx + side * (SX - SR + 0.8), L = Math.abs(x1 - x0), mx = (x0 + x1) / 2;
       station(cx + side * SX, z, SR, 0);
       // Bridge: deck, glass side rails with a white top rail, cyan edge lights and piers down to the sea.
@@ -4019,6 +4046,7 @@ CFT.loadModels = onProgress => {
       if (x > PORCH.x0 + 0.1 && x < PORCH.x1 - 0.1 && z > PORCH.z0 && z < PORCH.z1) return FLOOR;
       if (x > STEPS.x0 + 0.1 && x < STEPS.x1 - 0.1 && z >= STEPS.z0 && z < STEPS.z1) return FLOOR - 0.15 * (1 + Math.floor((z - STEPS.z0) / 0.3));
       if (onDeck(x, z, 1.1) && !inFootprint(x, z, PR)) return 0;
+      if (onBridge(x, z)) return 0;
       return null;
     };
 
@@ -4034,6 +4062,7 @@ CFT.loadModels = onProgress => {
         return { id: 'promenade', name: 'Exhibition Promenade' };
       }
       if (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < PORCH.z1) return { id: 'plaza', name: 'Entrance Porch' };
+      if (Math.abs(x - SEA.cx) > SEA.apo - 1) return { id: 'plaza', name: Math.abs(x - SEA.cx) > SEA.SX - SEA.SR ? 'Sea Station' : 'Sea Bridge' };
       return { id: 'plaza', name: 'Entrance Plaza' };
     };
 
@@ -4049,15 +4078,15 @@ CFT.loadModels = onProgress => {
         if (cur !== dest) { pts.push(outside(dest)); pts.push({ x: dest.door.x, z: dest.door.z }); }
         const d = Math.min(ex.radius + 1.8, 5);
         pts.push({ x: ex.pos.x + ex.front.x * d, z: ex.pos.z + ex.front.z * d });
-      } else pts.push({ x: 0, z: 6.5 });
+      } else pts.push({ x: 0, z: 7.6 });
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i], b = pts[i + 1], dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz;
         if (L2 < 1) continue;
         const t = Math.max(0, Math.min(1, -(a.x * dx + a.z * dz) / L2)), cx = a.x + dx * t, cz = a.z + dz * t, d = Math.hypot(cx, cz);
-        if (d < 5.4 && Math.hypot(a.x, a.z) > 5.4 && Math.hypot(b.x, b.z) > 5.4) {
+        if (d < 6.8 && Math.hypot(a.x, a.z) > 6.8 && Math.hypot(b.x, b.z) > 6.8) {
           let nx = cx, nz = cz;
           if (d < 0.01) { nx = -dz; nz = dx; }
-          const k = 6.6 / Math.hypot(nx, nz);
+          const k = 7.8 / Math.hypot(nx, nz);
           pts.splice(i + 1, 0, { x: nx * k, z: nz * k }); i++;
         }
       }
@@ -5509,7 +5538,7 @@ CFT.loadModels = onProgress => {
     return function update(dt) {
       if (G.phase !== 'play' || !G.world) { mesh.count = 0; return; }
       // The first time a visitor walks up to the lobby globe, the Craftech360 showreel opens.
-      if (!P().showreelSeen && Math.hypot(G.player.pos.x, G.player.pos.z) < 6.5) {
+      if (!P().showreelSeen && Math.hypot(G.player.pos.x, G.player.pos.z) < 7.4) {
         P().showreelSeen = true; G.save(); UI().openShowreel(); return;
       }
       const bd = G.pendingBoard();
