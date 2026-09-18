@@ -2763,10 +2763,10 @@ CFT.loadModels = onProgress => {
       // deep navy polished floor, pale grey sci-fi wall plates, teal glass, and cool blue-white light lines.
       floor: std({ map: TX.techFloor, color: 0x8C9AB8, emissiveMap: TX.techFloorGlow, emissive: 0x3F8FFF, emissiveIntensity: 0.12, roughness: 0.16, metalness: 0.4, envMapIntensity: 1.1 }),
       stone: std({ map: TX.techLight, emissiveMap: TX.techGlow, emissive: 0x8FDFFF, emissiveIntensity: 0.3, roughness: 0.42, metalness: 0.2, envMapIntensity: 0.8 }),
-      clad: std({ map: TX.techLight, color: 0xF2F4F6, roughness: 0.5, metalness: 0.15, envMapIntensity: 0.9 }),
+      clad: std({ map: TX.techLight, color: 0x62656A, roughness: 0.72, metalness: 0.15, envMapIntensity: 0.7 }),   // dark concrete (sunset render)
       base: std({ color: 0x8C9399, roughness: 0.7 }),
       ceil: std({ color: 0xE9EDF0, roughness: 0.8 }),
-      paving: std({ map: TX.floorLight, color: 0xD8DDE0, roughness: 0.3, metalness: 0.2, envMapIntensity: 1.1 }),
+      paving: std({ map: TX.floorLight, color: 0x8C9298, roughness: 0.22, metalness: 0.25, envMapIntensity: 1.2 }),   // darker, wet-looking deck
       ground: std({ color: 0x0B0E10, roughness: 1 }),
       metal: std({ color: 0xC9D0D6, metalness: 0.7, roughness: 0.25 }),
       gold: std({ color: 0xE6EBEF, metalness: 1, roughness: 0.18 }),
@@ -2786,6 +2786,7 @@ CFT.loadModels = onProgress => {
       // Cool light lines (the atrium's glowing floor ring). Names kept from the warm/gold scheme they replace.
       glowWarm: new T.MeshBasicMaterial({ color: 0xF2FAFF, toneMapped: false }),
       glowGold: new T.MeshBasicMaterial({ color: 0x8FDFFF, toneMapped: false }),
+      glowAmber: new T.MeshBasicMaterial({ color: 0xFFA630, toneMapped: false }),   // the sunset render's warm light strips
       glowExit: new T.MeshBasicMaterial({ color: 0x33E07A, toneMapped: false }),
       skylight: new T.MeshBasicMaterial({ color: 0x51677A }),
       // Light shafts: additive cones, bright at the ceiling and fading to nothing at the floor.
@@ -3670,11 +3671,11 @@ CFT.loadModels = onProgress => {
     A.slab(M.ceil, BLD.x0, TOP, -HO, -HO, BUILD_H, HO); A.slab(M.ceil, HO, TOP, -HO, BLD.x1, BUILD_H, HO);
     [[BLD.x0, BLD.z0, BLD.x1, BLD.z0 + 0.2], [BLD.x0, BLD.z1 - 0.2, BLD.x1, BLD.z1], [BLD.x0, BLD.z0, BLD.x0 + 0.2, BLD.z1], [BLD.x1 - 0.2, BLD.z0, BLD.x1, BLD.z1]]
       .forEach(([x0, z0, x1, z1]) => A.slab(M.clad, x0, BUILD_H, z0, x1, BUILD_H + 0.2, z1));
-    A.box(M.glowGold, 80, 0.04, 0.04, 0, BUILD_H - 0.35, BLD.z1 + 0.02);
+    A.box(M.glowAmber, 80, 0.05, 0.05, 0, BUILD_H - 0.35, BLD.z1 + 0.02);
     // The building render's signature: one crisp white light line running the whole façade at mid height,
     // returning down both side walls, with the warm wall-wash below it.
-    [[-40, -5], [5, 40]].forEach(([x0, x1]) => A.box(M.glowWarm, x1 - x0, 0.06, 0.06, (x0 + x1) / 2, FLOOR + 3.5, BLD.z1 + 0.04));
-    [BLD.x0 + 0.04, BLD.x1 - 0.04].forEach(x => A.box(M.glowWarm, 0.06, 0.06, 60, x, FLOOR + 3.5, 0));
+    [[-40, -5], [5, 40]].forEach(([x0, x1]) => A.box(M.glowAmber, x1 - x0, 0.06, 0.06, (x0 + x1) / 2, FLOOR + 3.5, BLD.z1 + 0.04));
+    [BLD.x0 + 0.04, BLD.x1 - 0.04].forEach(x => A.box(M.glowAmber, 0.06, 0.06, 60, x, FLOOR + 3.5, 0));
     for (let x = -37; x <= 37; x += 4.5) if (Math.abs(x) > 8) scallop(D, x, BLD.z1, 0, 1, { up: true, top: 7.6, h: 7.2, w: 2.8, k: 0.55 });
     [-30, -18, 18, 30].forEach(x => world.anchors.push({ pos: V(x, 3.2, BLD.z1 + 2.5), color: WARM.clone(), base: 0.5, range: 16 }));
     // Planters of low shrubs hugging the façade, uplit, as in the render.
@@ -3714,6 +3715,166 @@ CFT.loadModels = onProgress => {
       D.pools.push({ x, y: 0.014, z: 45, s: 3, c: WARM.clone().multiplyScalar(0.35) });
     });
     world.anchors.push({ pos: V(-6.5, 1.4, 54), color: WARM.clone(), base: 0.5, range: 9 }, { pos: V(6.5, 1.4, 60), color: WARM.clone(), base: 0.5, range: 9 });
+  }
+
+  // ---------------------------------------------------------------- Grand façade (the user's sunset render, cft1.png)
+  // Dark concrete and amber light: a giant octagonal sign with the glowing canted C over the entrance, two tall
+  // towers either side with amber light strips, text panels and antennas, slim spires behind, a ring light in the
+  // entrance, a dark wet approach walkway edged in amber with a CFT KINETIC sign wall, an OCEAN CONNECTS US panel,
+  // a raised walkway on pillars to the west lettered RESEARCH · BUILD · EXPERIENCE, and craft flying overhead.
+  function buildGrandFacade(A, M, D, scene, world, TX) {
+    const concrete = M.clad.clone(); concrete.color.setHex(0x4E5156); concrete.roughness = 0.78;
+    const dark = new T.MeshStandardMaterial({ color: 0x2A2D31, roughness: 0.55, metalness: 0.35 });
+    world.outdoor = (world.outdoor || []).concat([concrete, dark]);
+    const redM = new T.MeshBasicMaterial({ color: 0xFF3020, toneMapped: false });
+    const amber = M.glowAmber, lit =tex => new T.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false, depthWrite: false });
+    const text = (w, h, lines, o) => canvasTexture(w, h, (c, W, H) => {
+      o = o || {}; c.textBaseline = 'middle'; c.textAlign = o.align || 'left'; c.fillStyle = o.color || '#EDE7DD';
+      c.font = `${o.size || 64}px ${FONT.display}`;
+      if (c.letterSpacing !== undefined) c.letterSpacing = (o.track || 8) + 'px';
+      lines.forEach((t, i) => c.fillText(t, o.align === 'center' ? W / 2 : (o.x || 30), (o.y0 || 70) + i * (o.lh || 90)));
+      if (o.rule) { c.fillStyle = '#FFA630'; c.fillRect(o.align === 'center' ? W / 2 - 70 : (o.x || 30), (o.y0 || 70) + lines.length * (o.lh || 90) - 20, 140, 6); }
+    });
+
+    // Giant octagonal sign over the entrance.
+    const R = 8.4, cy = 16.6, cz = 38.8, face = cz + 0.72;
+    const oct = new T.CylinderGeometry(R, R, 1.4, 8); oct.rotateX(Math.PI / 2); oct.rotateZ(Math.PI / 8);
+    A.add(oct, concrete, 0, cy, cz);
+    A.box(concrete, 8, 1.2, 2.2, 0, 8.7, cz);
+    [R + 0.04, R - 0.9].forEach((r, i) => A.add(new T.TorusGeometry(r, i ? 0.035 : 0.08, 4, 8), amber, 0, cy, face + 0.02, 0, 0, Math.PI / 8));
+    const signTex = canvasTexture(1024, 1024, (c, W, H) => {
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      const mh = 430, mw = logoW('mark', mh);
+      c.shadowColor = 'rgba(255,150,40,0.9)'; c.shadowBlur = 40;
+      if (mw) logo(c, 'mark', (W - mw) / 2, 150, mh);
+      c.shadowBlur = 0; c.fillStyle = '#F2EEE8'; c.font = `96px ${FONT.display}`;
+      if (c.letterSpacing !== undefined) c.letterSpacing = '10px';
+      c.fillText('CFT KINETIC', W / 2, 690);
+      c.font = `40px ${FONT.display}`; c.fillStyle = '#D9D2C6'; c.fillText('IDEAS  MOTION  PEOPLE  TOGETHER', W / 2, 780);
+      c.fillStyle = '#FFA630'; c.fillRect(W / 2 - 60, 840, 120, 6);
+    });
+    const sg = new T.Mesh(new T.PlaneGeometry(12.4, 12.4), lit(signTex)); sg.position.set(0, cy, face + 0.03); scene.add(sg);
+    world.anchors.push({ pos: V(0, cy, face + 4), color: new T.Color(0xFFB060), base: 0.9, range: 22 });
+
+    // Two towers either side of the sign, and slim spires on the pavilion roof.
+    const tower = (sx, lines) => {
+      const x0 = sx > 0 ? 13 : -18, x1 = x0 + 5, z0 = 32.2, z1 = 39.5, xm = (x0 + x1) / 2, H = 26;
+      A.slab(concrete, x0, 0, z0, x1, H, z1);
+      A.slab(concrete, x0 + 0.6, H, z0 + 0.8, x1 - 0.6, H + 4, z1 - 1.2);
+      A.slab(dark, x0 + 1.2, H + 4, z0 + 1.6, x1 - 1.2, H + 5.2, z1 - 2);
+      [x0 + 0.08, x1 - 0.08].forEach(x => A.box(amber, 0.1, H - 1, 0.1, x, (H - 1) / 2 + 0.5, z1 + 0.05));
+      [9, 17.5].forEach(y => A.box(amber, 5, 0.06, 0.06, xm, y, z1 + 0.05));
+      A.box(amber, 3.8, 0.06, 0.06, xm, H + 3.6, z1 - 1.15);
+      [[-0.8, 9], [0.9, 6]].forEach(([dx, h]) => { A.add(new T.CylinderGeometry(0.06, 0.1, h, 8), dark, xm + dx, H + 5.2 + h / 2, z0 + 3); A.add(new T.SphereGeometry(0.16, 10, 8), redM, xm + dx, H + 5.2 + h, z0 + 3); });
+      const p = new T.Mesh(new T.PlaneGeometry(4.2, 5.6), lit(text(512, 680, lines, { size: 64, lh: 92, y0: 120, x: 40, rule: true })));
+      p.position.set(xm, 19.2, z1 + 0.04); scene.add(p);
+      world.colliders.push({ x0, x1, z0, z1 });
+    };
+    tower(1, ['A', 'BRIGHTER', 'TOMORROW', 'IN MOTION']);
+    tower(-1, ['A', 'HUMAN', 'TECHNOLOGY', 'NATURE', 'IN SYNC']);
+    [-9.2, 9.2].forEach(x => {
+      A.box(concrete, 1.6, 22, 1.6, x, 8.2 + 11, 34);
+      A.box(amber, 0.08, 20, 0.08, x, 8.2 + 11, 34.84);
+      A.add(new T.CylinderGeometry(0.05, 0.08, 6, 8), dark, x, 33.2, 34);
+    });
+    // Ring lights in the entrance hall ceiling.
+    [2.4, 3.4].forEach(r => A.add(new T.TorusGeometry(r, 0.05, 6, 72), amber, 0, FLOOR + OPEN_H - 0.08, 35.6, 0, Math.PI / 2));
+
+    // Approach walkway: dark wet paving edged with amber light lines, from the plaza to the steps.
+    const walkM = new T.MeshStandardMaterial({ color: 0x15171A, roughness: 0.3, metalness: 0, envMapIntensity: 0.6 });
+    world.outdoor.push(walkM);
+    const walk = new T.Mesh(new T.PlaneGeometry(6, 36), walkM); walk.rotation.x = -Math.PI / 2; walk.position.set(0, 0.006, 64.2); walk.renderOrder = 1; scene.add(walk);
+    [-3.05, 3.05].forEach(x => A.box(amber, 0.08, 0.02, 36, x, 0.014, 64.2));
+    for (let z = 48; z < 82; z += 3) A.box(amber, 0.5, 0.012, 0.05, 0, 0.012, z);
+    // CFT KINETIC sign wall at the start of the walkway, and the OCEAN CONNECTS US panel across from it.
+    const wall = (x, z, ry, w, h, tex) => {
+      const g = new T.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g);
+      const b = new T.Mesh(new T.BoxGeometry(w, h, 0.9), concrete); b.position.y = h / 2; g.add(b);
+      const f = new T.Mesh(new T.PlaneGeometry(w - 0.4, h - 0.4), lit(tex)); f.position.set(0, h / 2, 0.46); g.add(f);
+      [0.12, h - 0.1].forEach(y => { const s = new T.Mesh(new T.BoxGeometry(w, 0.05, 0.05), amber); s.position.set(0, y, 0.47); g.add(s); });
+      world.colliders.push({ x, z, r: w / 2 + 0.3 });
+    };
+    wall(-9.5, 74, 0.35, 6.4, 3.4, canvasTexture(1024, 480, (c, W, H) => {
+      c.textBaseline = 'middle'; const mh = 150, mw = logoW('mark', mh);
+      c.shadowColor = 'rgba(255,150,40,0.9)'; c.shadowBlur = 24; if (mw) logo(c, 'mark', 40, 40, mh); c.shadowBlur = 0;
+      c.fillStyle = '#F2EEE8'; c.font = `92px ${FONT.display}`; c.fillText('CFT KINETIC', 60 + mw, 118);
+      c.font = `38px ${FONT.display}`; c.fillStyle = '#CFC8BC'; if (c.letterSpacing !== undefined) c.letterSpacing = '8px';
+      ['IDEAS', 'MOTION', 'PEOPLE', 'TOGETHER'].forEach((t, i) => c.fillText(t, 60, 250 + i * 54));
+    }));
+    wall(9.5, 76, -0.35, 4.6, 2.6, text(640, 360, ['OCEAN', 'CONNECTS', 'US'], { size: 56, lh: 76, y0: 80, x: 50, rule: true }));
+
+    // Raised walkway on pillars to the west, lettered along its side.
+    const WZ = 36, WY = 6.8, wx0 = -19, wx1 = -78, L = wx0 - wx1, wm = (wx0 + wx1) / 2;
+    A.box(concrete, L, 0.9, 5, wm, WY - 0.45, WZ);
+    A.box(amber, L, 0.05, 0.05, wm, WY - 0.95, WZ + 2.52);
+    A.box(M.glass, L, 1.1, 0.05, wm, WY + 0.55, WZ + 2.4); A.box(M.white, L, 0.07, 0.1, wm, WY + 1.12, WZ + 2.4);
+    for (let x = wx0 - 6; x > wx1; x -= 12) {
+      A.box(concrete, 1.1, WY - 0.9, 1.1, x, (WY - 0.9) / 2, WZ);
+      A.box(concrete, 3.6, 0.6, 1.2, x, WY - 1.2, WZ);
+      world.colliders.push({ x, z: WZ, r: 0.8 });
+    }
+    const fascia = canvasTexture(4096, 128, (c, W, H) => {
+      c.fillStyle = '#1C1E21'; c.fillRect(0, 0, W, H); c.fillStyle = '#E8E2D8'; c.textBaseline = 'middle'; c.font = `64px ${FONT.display}`;
+      if (c.letterSpacing !== undefined) c.letterSpacing = '12px';
+      const words = ['RESEARCH', 'BUILD', 'EXPERIENCE', 'IDEAS', 'MOTION'];
+      for (let x = 60, i = 0; x < W; i++) { const t = words[i % words.length]; c.fillText(t, x, H / 2 + 4); x += c.measureText(t).width + 260; }
+    });
+    const fa = new T.Mesh(new T.PlaneGeometry(L, 0.8), lit(fascia)); fa.position.set(wm, WY - 0.45, WZ + 2.51); scene.add(fa);
+    A.box(concrete, 6, WY + 4, 6, wx1 - 2, (WY + 4) / 2, WZ);
+    A.box(amber, 6, 0.06, 0.06, wx1 - 2, WY + 3.2, WZ + 3.02);
+
+    // Flying craft circling the station with glowing engines and blinking navigation lights.
+    const hullM = new T.MeshStandardMaterial({ color: 0x3A3F46, roughness: 0.35, metalness: 0.7 });
+    const glowE = new T.MeshBasicMaterial({ color: 0xFFB45A, toneMapped: false }), navR = new T.MeshBasicMaterial({ color: 0xFF3B3B, toneMapped: false }), navW = new T.MeshBasicMaterial({ color: 0xFFFFFF, toneMapped: false });
+    const craft = [0, 1, 2].map(i => {
+      const g = new T.Group(), s = 1.4 + i * 0.3;
+      const body = new T.Mesh(new T.SphereGeometry(1, 20, 12), hullM); body.scale.set(1.1 * s, 0.55 * s, 3.6 * s); g.add(body);
+      const cab = new T.Mesh(new T.SphereGeometry(0.7 * s, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), new T.MeshStandardMaterial({ color: 0x0E1822, roughness: 0.1, metalness: 0.6 }));
+      cab.scale.z = 1.8; cab.position.set(0, 0.35 * s, 1.2 * s); g.add(cab);
+      const wing = new T.Mesh(new T.BoxGeometry(7 * s, 0.16 * s, 1.6 * s), hullM); wing.position.z = -0.4 * s; g.add(wing);
+      [-1, 1].forEach(sx => [-1.4, 1.2].forEach(oz => {
+        const pod = new T.Mesh(new T.CylinderGeometry(0.45 * s, 0.5 * s, 0.6 * s, 16), hullM); pod.position.set(sx * 3.2 * s, 0, oz * s); g.add(pod);
+        const e = new T.Mesh(new T.CircleGeometry(0.38 * s, 16), glowE); e.rotation.x = Math.PI / 2; e.position.set(sx * 3.2 * s, -0.31 * s, oz * s); g.add(e);
+      }));
+      const nr = new T.Mesh(new T.SphereGeometry(0.12 * s, 8, 6), navR); nr.position.set(-3.5 * s, 0, -0.4 * s); g.add(nr);
+      const nw = new T.Mesh(new T.SphereGeometry(0.12 * s, 8, 6), navW); nw.position.set(3.5 * s, 0, -0.4 * s); g.add(nw);
+      scene.add(g);
+      return { g, nr, nw, r: 70 + i * 28, h: 24 + i * 7, w: (0.05 + i * 0.012) * (i % 2 ? -1 : 1), a: i * 2.1 };
+    });
+    let t = 0;
+    world.animated.push({ update(dt) {
+      t += dt;
+      craft.forEach(c => {
+        c.a += c.w * dt;
+        c.g.position.set(Math.sin(c.a) * c.r, c.h + Math.sin(t * 0.6 + c.r) * 1.2, 15 + Math.cos(c.a) * c.r);
+        c.g.rotation.set(0, c.a + (c.w > 0 ? Math.PI / 2 : -Math.PI / 2), (c.w > 0 ? -1 : 1) * 0.12);
+        const on = (t + c.r) % 1.4 < 0.15; c.nr.visible = c.nw.visible = on;
+      });
+    } });
+  }
+
+  // Sunset sky (the user's render): deep blue-violet overhead, clouds lit orange from below, a low golden sun with a
+  // bright band along the horizon, and a dark sea with the sun's glitter on it.
+  function sunsetSkyURL() {
+    const W = 2048, H = 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, '#141A33'); gr.addColorStop(0.22, '#2E3150'); gr.addColorStop(0.36, '#6A5470'); gr.addColorStop(0.44, '#C9826A');
+    gr.addColorStop(0.485, '#F2B26A'); gr.addColorStop(0.5, '#FFD592'); gr.addColorStop(0.51, '#2A3440'); gr.addColorStop(1, '#070D14');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const sx = W * 0.62, sy = H * 0.485;
+    const sun = g.createRadialGradient(sx, sy, 0, sx, sy, 360);
+    sun.addColorStop(0, 'rgba(255,236,190,1)'); sun.addColorStop(0.06, 'rgba(255,200,120,0.9)'); sun.addColorStop(0.3, 'rgba(255,150,70,0.35)'); sun.addColorStop(1, 'rgba(255,120,60,0)');
+    g.fillStyle = sun; g.fillRect(sx - 360, sy - 360, 720, 720);
+    // Clouds: dark violet masses with warm lit undersides, thicker towards the horizon.
+    for (let i = 0; i < 260; i++) {
+      const x = Geo.hash(i, 1, 97) * W, y = H * (0.1 + Math.pow(Geo.hash(i, 2, 97), 0.7) * 0.34), rx = 40 + Geo.hash(i, 3, 97) * 170, ry = rx * (0.18 + Geo.hash(i, 4, 97) * 0.18);
+      const near = Math.max(0, 1 - Math.abs(x - sx) / (W * 0.45)), cg = g.createRadialGradient(x, y + ry * 0.5, 0, x, y, rx);
+      cg.addColorStop(0, `rgba(${255},${150 + near * 70 | 0},${90 + near * 40 | 0},${0.18 + near * 0.3})`); cg.addColorStop(0.5, 'rgba(70,58,86,0.22)'); cg.addColorStop(1, 'rgba(40,40,70,0)');
+      g.save(); g.translate(x, y); g.scale(1, ry / rx); g.translate(-x, -y); g.fillStyle = cg; g.beginPath(); g.arc(x, y, rx, 0, Math.PI * 2); g.fill(); g.restore();
+    }
+    // Sun glitter on the sea.
+    for (let i = 0; i < 400; i++) { const y = H * 0.505 + Math.pow(Geo.hash(i, 5, 97), 2) * H * 0.2, x = sx + (Geo.hash(i, 6, 97) - 0.5) * (60 + (y - H * 0.5) * 1.4); g.fillStyle = `rgba(255,200,120,${0.25 + Geo.hash(i, 7, 97) * 0.4})`; g.fillRect(x, y, 6 + Geo.hash(i, 8, 97) * 18, 1.5); }
+    return c.toDataURL('image/jpeg', 0.92);
   }
 
   // ---------------------------------------------------------------- The sea (the user's floating-station reference)
@@ -3926,7 +4087,7 @@ CFT.loadModels = onProgress => {
     const TX = CFT.Tex.make(), M = makeMaterials(TX), D = makeDecals(), A = new Geo.Batch();
     // The painted sea-haze sky comes first and is the default; the city panoramas stay selectable.
     // The night sky is the default; the day sea haze and the city panoramas stay selectable (Sky, pause menu).
-    CFT.SKIES = Object.assign({ night: nightSkyURL(), sea: seaSkyURL() }, CFT.SKIES || {});
+    CFT.SKIES = Object.assign({ sunset: sunsetSkyURL(), night: nightSkyURL(), sea: seaSkyURL() }, CFT.SKIES || {});
     const world = {
       FLOOR, TOP, HALL, LOBBY_R, rooms: ROOMS, exhibits: [], colliders: [], kiosks: [], anchors: [], animated: [],
       doors: null, beacon: null, reflector: null, floorMats: [], quality: 'high'
@@ -4012,6 +4173,7 @@ CFT.loadModels = onProgress => {
     });
     buildLobby(A, M, D, scene, world);
     buildEntranceAndExterior(A, M, D, scene, world);
+    buildGrandFacade(A, M, D, scene, world, TX);
     buildSea(A, M, D, scene, world, TX);
     A.build(scene);
     buildDecals(scene, TX, D);
@@ -4045,9 +4207,13 @@ CFT.loadModels = onProgress => {
       if (!world.skies.length) return;
       if (!CFT.SKIES[id]) id = world.skies.includes('sea') ? 'sea' : world.skies[0];
       world.sky = id;
-      world.setNight(id === 'night' || id === 'shanghai');
+      world.setNight(id === 'night' || id === 'shanghai', id === 'sunset');
       // The sea reflects whichever sky is up (a prefiltered copy, so the rough swell blurs it).
-      const show = c => { scene.background = c.tex; if (world.water) { world.water.material.envMap = c.env; world.water.material.needsUpdate = true; } };
+      const show = c => {
+        scene.background = c.tex; if (world.water) { world.water.material.envMap = c.env; world.water.material.needsUpdate = true; }
+        // Outdoor surfaces reflect this sky too, not the bright indoor reflection room.
+        (world.outdoor || []).forEach(m => { m.envMap = c.env; m.needsUpdate = true; });
+      };
       if (skyCache[id]) { show(skyCache[id]); return; }
       new T.TextureLoader().load(CFT.SKIES[id], t => {
         t.mapping = T.EquirectangularReflectionMapping; t.encoding = T.sRGBEncoding;
@@ -4059,8 +4225,9 @@ CFT.loadModels = onProgress => {
     // Night: dim moonlight instead of the sun, a dark sea and haze, and the station's light bands, floor lines and
     // wall seams glowing brighter (renderer exposure and bloom follow world.night in the render loop).
     const DAY = { fog: scene.fog.color.getHex(), bg: 0xBFD6E4, stone: M.stone.emissiveIntensity, floor: M.floor.emissiveIntensity };
-    world.setNight = function (on) {
-      world.night = on;
+    const sunDay = world.env.sun.position.clone();
+    world.setNight = function (on, sunset) {
+      world.night = on; world.sunset = !!sunset;
       const { hemi, sun } = world.env;
       hemi.intensity = on ? 0.2 : 0.55; hemi.color.setHex(on ? 0x5A7AA8 : 0xE4F0F7); hemi.groundColor.setHex(on ? 0x0A1018 : 0x3A4A50);
       sun.intensity = on ? 0.28 : 0.9; sun.color.setHex(on ? 0x9DB8E8 : 0xFFF6EA);
@@ -4073,6 +4240,20 @@ CFT.loadModels = onProgress => {
         m.envMapIntensity = d.env * (on ? 0.22 : 1); m.color.setHex(d.col); if (on) m.color.multiplyScalar(0.6);
       });
       if (world.nightPools) world.nightPools.visible = on;
+      // Sunset: a low golden sun behind the station (the façade is lit by its own amber lights), warm haze, dark
+      // sea, and the deck lamps on.
+      sun.position.copy(sunDay);
+      if (sunset) {
+        hemi.intensity = 0.42; hemi.color.setHex(0xFFC9A6); hemi.groundColor.setHex(0x1E1A24);
+        sun.intensity = 1.25; sun.color.setHex(0xFFA861); sun.position.set(-110, 38, -150);
+        scene.fog.color.setHex(0x6E5560); scene.fog.near = 150; scene.fog.far = 1250;
+        if (world.water) { world.water.material.color.setHex(0x04141E); world.water.material.envMapIntensity = 1.1; }
+        if (world.bandM) world.bandM.emissiveIntensity = 1.1;
+        (world.outdoor || []).forEach(m => { const d = m.userData.day; m.envMapIntensity = d.env * 0.4; m.color.setHex(d.col); m.color.multiplyScalar(0.55); });
+        if (world.nightPools) world.nightPools.visible = true;
+      }
+      const pool = world.nightPools && world.nightPools.children[0];
+      if (pool) pool.material.opacity = sunset ? 0.28 : 0.55;
     };
 
     world.setQuality = function (q) {
@@ -4230,7 +4411,7 @@ CFT.loadModels = onProgress => {
     const s = Math.min(w / 84, h / 84);
     return { s, cx: w / 2, cy: h / 2 - 10 * s };
   };
-  CFT.SKY_NAMES = { night: 'Night sea · stars', sea: 'Open sea · day', johannesburg: 'Johannesburg skyline · sunset', dusseldorf: 'Düsseldorf harbour · blue hour', shanghai: 'Shanghai Bund · night' };
+  CFT.SKY_NAMES = { sunset: 'Sunset sea · golden hour', night: 'Night sea · stars', sea: 'Open sea · day', johannesburg: 'Johannesburg skyline · sunset', dusseldorf: 'Düsseldorf harbour · blue hour', shanghai: 'Shanghai Bund · night' };
 
   // Map colours: the paper plan (lobby kiosk) and the dark holographic plan (map overlay and on-screen minimap).
   const MAP_PAPER = { site: '#D9DEE2', porch: '#C6CDD2', ink: '#15191D', bld: '#FFFFFF', pav: '#AEB6BC', hall: '#F3F5F6', room: '#FFFFFF', svc: '#ECEFF1', hover: '#FFF1C2', seen: '#E1E6E9',
@@ -5658,7 +5839,7 @@ CFT.loadModels = onProgress => {
   const G = CFT.G = {
     state: {
       progress: freshProgress(),
-      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'night', seaSky: true, nightSky: true, view: 'first', guide: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.nightSky ? { sky: 'night', seaSky: true, nightSky: true } : null)
+      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true, view: 'first', guide: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.sunsetSky ? { sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true } : null)
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     player: { pos: new T.Vector3(0, 0, 54), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
@@ -6539,8 +6720,9 @@ CFT.loadModels = onProgress => {
     UI().tick(dt);
     if (UI().isOpen('map')) UI().drawMap();
     const night = !!(G.world && G.world.night);
-    renderer.toneMappingExposure = night ? 1.0 : 0.82;
-    if (post) post.bloom.strength = night ? 0.8 : 0.45;
+    const sunset = !!(G.world && G.world.sunset);
+    renderer.toneMappingExposure = night ? 1.0 : sunset ? 0.9 : 0.82;
+    if (post) post.bloom.strength = night ? 0.8 : sunset ? 0.7 : 0.45;
     if (G.usePost) post.c.render(dt); else renderer.render(scene, camera);
     // Step graphics down while the frame rate stays low: on the title and intro too, so a slower machine does not sit
     // on a frozen-looking screen. A single long frame counts as at most one second.
