@@ -634,6 +634,8 @@
         <label class="setting"><span>Sky</span><select id="set-sky"></select></label>
         <label class="setting"><span>Third-person view · C</span><input type="checkbox" id="set-view"></label>
         <label class="setting"><span>Tour guide robot</span><input type="checkbox" id="set-guide"></label>
+        <label class="setting"><span>Guide robot colour</span><select id="set-guide-color"><option value="yellow">CFT Yellow</option><option value="white">White</option><option value="black">Black</option><option value="olive">Olive Green</option></select></label>
+        <label class="setting"><span>Show guide robot rig (bones)</span><input type="checkbox" id="set-guide-rig"></label>
         <label class="setting"><span>Other visitors</span><input type="checkbox" id="set-crowd"></label>
       </div>
       <h3 class="section-label">Controls</h3>
@@ -4809,6 +4811,7 @@ CFT.loadModels = onProgress => {
     $('set-sens').value = S.sensitivity; $('set-vol').value = S.volume;
     $('set-voice').checked = S.voice; $('set-invert').checked = S.invertY;
     $('set-view').checked = S.view === 'third'; $('set-guide').checked = S.guide !== false; $('set-crowd').checked = S.crowd !== false;
+    $('set-guide-color').value = S.guideColor || 'yellow'; $('set-guide-rig').checked = !!S.guideRig;
     $('set-quality').value = S.quality;
     const g = G();
     $('set-sky').innerHTML = g.world.skies.map(id => `<option value="${id}">${CFT.SKY_NAMES[id] || id}</option>`).join('');
@@ -4834,6 +4837,8 @@ CFT.loadModels = onProgress => {
     $('set-invert').onchange = e => { S().invertY = e.target.checked; G().save(); };
     $('set-view').onchange = e => G().setView(e.target.checked ? 'third' : 'first');
     $('set-guide').onchange = e => { S().guide = e.target.checked; G().applyPeople(); G().save(); };
+    $('set-guide-color').onchange = e => { S().guideColor = e.target.value; G().applyPeople(); G().save(); };
+    $('set-guide-rig').onchange = e => { S().guideRig = e.target.checked; G().applyPeople(); G().save(); };
     $('set-crowd').onchange = e => { S().crowd = e.target.checked; G().applyPeople(); G().save(); };
     $('set-quality').onchange = e => G().setQuality(e.target.value, true);
     $('set-sky').onchange = e => { S().sky = e.target.value; G().world.setSky(S().sky); G().save(); };
@@ -5025,13 +5030,23 @@ CFT.loadModels = onProgress => {
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
   // ------------------------------------------------ The CFT GUIDE robot (the team's concept sheet, 2026-09-18)
-  // A yellow dome head on a white band with two big camera-lens eyes ringed in orange light and black eyebrow light
-  // bars, a boxy yellow body with the CFT KINETIC mark, thin black upper arms with chrome pistons and long yellow
-  // forearm shells ending in black grippers, and short legs that each roll on a wheel with a glowing strip.
-  // Faces +z, about 1.5 m tall. update(dt, speed) rolls the wheels and moves the body; gesture(name) returns its length.
+  // A rigged robot: a skeleton of named bones (cg_root, cg_hips, cg_spine, cg_neck, cg_head, cg_browL/R, cg_eyeL/R,
+  // cg_shoulderL/R > cg_elbowL/R > cg_wristL/R > cg_fingerL1/L2/R1/R2, cg_thighL/R > cg_shinL/R > cg_wheelL/R) with
+  // the rigid parts attached to their bones, as a mechanical rig in a game engine. Keyframed AnimationClips (Idle,
+  // Roll, Wave, ThumbsUp, Yes, Point, LookAround, Celebrate) are played and cross-faded by an AnimationMixer; only the
+  // wheels are turned in code, from the rolling speed. Each eye is a small screen that draws the current expression
+  // (normal, blink, focus, happy, wide, heart, sleepy). Four paint options from the sheet: CFT Yellow, White, Black,
+  // Olive Green. Faces +z, about 1.5 m tall.
   function makeGuideBot() {
     const Geo = CFT.Geo, rb = (w, h, d, r) => Geo.roundedBox(w, h, d, r);
-    // Painted yellow metal with a clear coat, faint wear in the roughness so the reflections break up a little.
+    const PAINTS = {
+      yellow: { paint: 0xE0A000, rough: 0.36, metal: 0.2, trim: 0xD3D8DC, eye: '#FF9A2E', led: 0xFFE2B0, ink: '#1B1C1E', invert: false },
+      white: { paint: 0xE4E7EA, rough: 0.3, metal: 0.1, trim: 0x8E969D, eye: '#FF9A2E', led: 0xFFE2B0, ink: '#1B1C1E', invert: false },
+      black: { paint: 0x1D2024, rough: 0.32, metal: 0.45, trim: 0x70777E, eye: '#3FB2FF', led: 0xA8DCFF, ink: '#E8ECEF', invert: true },
+      olive: { paint: 0x3E4A26, rough: 0.45, metal: 0.2, trim: 0xB7BCC0, eye: '#FF9A2E', led: 0xFFE2B0, ink: '#15170F', invert: false }
+    };
+    let paint = PAINTS.yellow;
+    // Painted metal with a clear coat, faint wear in the roughness so the reflections break up a little.
     const wear = (() => {
       const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
       x.fillStyle = '#7a7a7a'; x.fillRect(0, 0, 256, 256);
@@ -5040,152 +5055,269 @@ CFT.loadModels = onProgress => {
       const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t;
     })();
     const M = {
-      yellow: new T.MeshPhysicalMaterial({ color: 0xE0A000, roughness: 0.36, roughnessMap: wear, metalness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.25 }),
-      silver: new T.MeshStandardMaterial({ color: 0xD3D8DC, roughness: 0.3, metalness: 0.85 }),
+      paint: new T.MeshPhysicalMaterial({ color: paint.paint, roughness: paint.rough, roughnessMap: wear, metalness: paint.metal, clearcoat: 0.6, clearcoatRoughness: 0.25 }),
+      trim: new T.MeshStandardMaterial({ color: paint.trim, roughness: 0.3, metalness: 0.85 }),
       black: new T.MeshStandardMaterial({ color: 0x17191C, roughness: 0.45, metalness: 0.5 }),
       rubber: new T.MeshStandardMaterial({ color: 0x0E0F10, roughness: 0.85, metalness: 0 }),
       chrome: new T.MeshStandardMaterial({ color: 0xEDEFF1, roughness: 0.1, metalness: 1 }),
-      lens: new T.MeshPhysicalMaterial({ color: 0x020304, roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.35 }),
-      glow: new T.MeshBasicMaterial({ color: 0xFF9A2E, toneMapped: false }),
-      led: new T.MeshBasicMaterial({ color: 0xFFE2B0, toneMapped: false })
+      glass: new T.MeshPhysicalMaterial({ color: 0x0A0C10, roughness: 0.02, metalness: 0, transparent: true, opacity: 0.25, clearcoat: 1, clearcoatRoughness: 0.02, depthWrite: false }),
+      glow: new T.MeshBasicMaterial({ color: paint.eye, toneMapped: false }),
+      led: new T.MeshBasicMaterial({ color: paint.led, toneMapped: false })
     };
-    const mesh = (geo, m, x, y, z, parent) => { const o = new T.Mesh(geo, m); o.position.set(x || 0, y || 0, z || 0); o.castShadow = true; (parent || root).add(o); return o; };
+    const SHELL = [M.paint, M.trim, M.black, M.rubber, M.chrome];
+    const root = new T.Group(), bones = {};
+    const bone = (name, parent, x, y, z) => { const b = new T.Bone(); b.name = 'cg_' + name; b.position.set(x, y, z); (parent ? bones[parent] : root).add(b); bones[name] = b; return b; };
+    bone('root', null, 0, 0, 0);
+    bone('hips', 'root', 0, 0.62, 0); bone('spine', 'hips', 0, 0.06, 0); bone('neck', 'spine', 0, 0.37, 0); bone('head', 'neck', 0, 0.07, 0);
+    [['L', 1], ['R', -1]].forEach(([n, s]) => {
+      bone('brow' + n, 'head', s * 0.165, 0.3, 0.25); bone('eye' + n, 'head', s * 0.165, 0.13, 0.31);
+      bone('shoulder' + n, 'spine', s * 0.21, 0.3, 0); bone('elbow' + n, 'shoulder' + n, s * 0.012, -0.27, 0); bone('wrist' + n, 'elbow' + n, 0, -0.37, 0);
+      bone('finger' + n + '1', 'wrist' + n, 0, -0.055, 0.034); bone('finger' + n + '2', 'wrist' + n, 0, -0.055, -0.034);
+      bone('thigh' + n, 'root', s * 0.15, 0.605, 0); bone('shin' + n, 'thigh' + n, 0, -0.165, 0); bone('wheel' + n, 'shin' + n, 0, -0.33, 0);
+    });
+    // Bind (rest) pose: arms a little out from the body, elbows a little bent, grippers a little open, brows tilted.
+    const BASE = { shoulderL: [0, 0, 0.2], shoulderR: [0, 0, -0.2], elbowL: [-0.25, 0, 0], elbowR: [-0.25, 0, 0], browL: [-0.3, 0, 0], browR: [-0.3, 0, 0],
+      fingerL1: [-0.12, 0, 0], fingerL2: [0.12, 0, 0], fingerR1: [-0.12, 0, 0], fingerR2: [0.12, 0, 0] };
+    Object.keys(BASE).forEach(k => bones[k].rotation.set(...BASE[k]));
+    const skeleton = new T.Skeleton(Object.values(bones));
+
+    const mesh = (geo, m, x, y, z, parent) => { const o = new T.Mesh(geo, m); o.position.set(x || 0, y || 0, z || 0); o.castShadow = true; (typeof parent === 'string' ? bones[parent] : parent).add(o); return o; };
     const cylX = (r, h, seg) => { const g = new T.CylinderGeometry(r, r, h, seg || 24); g.rotateZ(Math.PI / 2); return g; };
     const cylZ = (r0, r1, h, seg) => { const g = new T.CylinderGeometry(r0, r1, h, seg || 32); g.rotateX(Math.PI / 2); return g; };
+    const decals = [];
     const decal = (w, h, draw) => {
-      const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w); const x = c.getContext('2d'); draw(x, c.width, c.height);
+      const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512 * h / w); const x = c.getContext('2d');
       const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; t.anisotropy = 4;
+      const d = { redraw() { x.clearRect(0, 0, c.width, c.height); draw(x, c.width, c.height); t.needsUpdate = true; } }; d.redraw(); decals.push(d);
       return new T.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.4, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -2 });
     };
-    const root = new T.Group(), body = new T.Group(); root.add(body);
 
-    // Legs: wheel, cover with a glowing strip and "03", yellow knee block, black knee, chrome piston, hip joint.
-    const wheels = [];
-    [-1, 1].forEach(s => {
-      const x = s * 0.15;
-      const w = new T.Group(); w.position.set(x, 0.11, 0); root.add(w); wheels.push(w);
-      mesh(cylX(0.11, 0.075, 32), M.rubber, 0, 0, 0, w);
-      [-1, 1].forEach(k => mesh(cylX(0.075, 0.08, 24), M.silver, k * 0.002, 0, 0, w));
-      for (let i = 0; i < 6; i++) { const b = mesh(new T.BoxGeometry(0.082, 0.02, 0.05), M.black, 0, 0, 0, w); b.rotation.x = i * Math.PI / 3; b.translateY(0.045); }
-      mesh(rb(0.115, 0.14, 0.25, 0.03), M.silver, x, 0.2, -0.005);
-      mesh(new T.BoxGeometry(0.014, 0.07, 0.005), M.glow, x, 0.2, 0.123);
+    // Legs: hip joint and piston on the thigh bone; knee, knee block and wheel cover (glowing strip, "03") on the shin.
+    [['L', 1], ['R', -1]].forEach(([n, s]) => {
+      const th = 'thigh' + n, sh = 'shin' + n, wh = 'wheel' + n;
+      mesh(new T.SphereGeometry(0.045, 18, 12), M.black, 0, 0, 0, th);
+      mesh(new T.CylinderGeometry(0.03, 0.03, 0.14, 12), M.black, 0, -0.085, -0.02, th);
+      mesh(new T.CylinderGeometry(0.016, 0.016, 0.15, 10), M.chrome, 0, -0.085, 0.025, th);
+      mesh(new T.SphereGeometry(0.048, 20, 14), M.black, 0, 0, 0, sh);
+      mesh(rb(0.13, 0.15, 0.15, 0.035), M.paint, 0, -0.095, 0, sh);
+      mesh(rb(0.115, 0.14, 0.25, 0.03), M.trim, 0, -0.24, -0.005, sh);
+      mesh(new T.BoxGeometry(0.014, 0.07, 0.005), M.glow, 0, -0.24, 0.123, sh);
       const tag = decal(0.08, 0.04, (g, W, H) => { g.fillStyle = '#2A2D31'; g.font = `700 ${H * 0.8}px "Helvetica Neue", Arial, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('03', W / 2, H / 2); });
-      const tg = mesh(new T.PlaneGeometry(0.06, 0.03), tag, x + s * 0.059, 0.23, 0); tg.rotation.y = s * Math.PI / 2;
-      mesh(rb(0.13, 0.15, 0.15, 0.035), M.yellow, x, 0.345, 0);
-      mesh(new T.SphereGeometry(0.048, 20, 14), M.black, x, 0.44, 0);
-      mesh(new T.CylinderGeometry(0.03, 0.03, 0.14, 12), M.black, x, 0.52, -0.02);
-      mesh(new T.CylinderGeometry(0.016, 0.016, 0.15, 10), M.chrome, x, 0.52, 0.025);
-      mesh(new T.SphereGeometry(0.045, 18, 12), M.black, x, 0.605, 0);
+      mesh(new T.PlaneGeometry(0.06, 0.03), tag, s * 0.059, -0.21, 0, sh).rotation.y = s * Math.PI / 2;
+      mesh(cylX(0.11, 0.075, 32), M.rubber, 0, 0, 0, wh);
+      [-1, 1].forEach(k => mesh(cylX(0.075, 0.08, 24), M.trim, k * 0.002, 0, 0, wh));
+      for (let i = 0; i < 6; i++) { const b = mesh(new T.BoxGeometry(0.082, 0.02, 0.05), M.black, 0, 0, 0, wh); b.rotation.x = i * Math.PI / 3; b.translateY(0.045); }
     });
-    // Hips, body shell with white trim, the CFT KINETIC mark on the chest and a vent panel on the back.
-    mesh(rb(0.38, 0.07, 0.25, 0.03), M.silver, 0, 0.64, 0, body);
-    mesh(new T.BoxGeometry(0.3, 0.03, 0.2), M.black, 0, 0.685, 0, body);
-    mesh(rb(0.33, 0.33, 0.25, 0.045), M.yellow, 0, 0.86, 0, body);
-    mesh(rb(0.35, 0.035, 0.26, 0.015), M.silver, 0, 0.705, 0, body);
-    mesh(rb(0.31, 0.035, 0.23, 0.015), M.silver, 0, 1.03, 0, body);
-    const im = CFT.LOGO_IMG && CFT.LOGO_IMG.mark;
+    // Hips and body shell with trim bands, the CFT KINETIC mark on the chest and a vent panel on the back.
+    mesh(rb(0.38, 0.07, 0.25, 0.03), M.trim, 0, 0.02, 0, 'hips');
+    mesh(new T.BoxGeometry(0.3, 0.03, 0.2), M.black, 0, 0.065, 0, 'hips');
+    mesh(rb(0.33, 0.33, 0.25, 0.045), M.paint, 0, 0.18, 0, 'spine');
+    mesh(rb(0.35, 0.035, 0.26, 0.015), M.trim, 0, 0.025, 0, 'spine');
+    mesh(rb(0.31, 0.035, 0.23, 0.015), M.trim, 0, 0.35, 0, 'spine');
     const chest = decal(0.24, 0.16, (g, W, H) => {
-      if (im) { const mh = H * 0.42, mw = mh * im.naturalWidth / im.naturalHeight; g.filter = 'brightness(0)'; g.drawImage(im, (W - mw) / 2, H * 0.08, mw, mh); g.filter = 'none'; }
-      g.fillStyle = '#1B1C1E'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const im = CFT.LOGO_IMG && CFT.LOGO_IMG.mark;
+      if (im) { const mh = H * 0.42, mw = mh * im.naturalWidth / im.naturalHeight; g.filter = paint.invert ? 'brightness(0) invert(1)' : 'brightness(0)'; g.drawImage(im, (W - mw) / 2, H * 0.08, mw, mh); g.filter = 'none'; }
+      g.fillStyle = paint.ink; g.textAlign = 'center'; g.textBaseline = 'middle';
       g.font = `800 ${H * 0.2}px "Helvetica Neue", Arial, sans-serif`; g.fillText('CFT KINETIC', W / 2, H * 0.68);
       g.font = `500 ${H * 0.07}px "Helvetica Neue", Arial, sans-serif`; g.fillText('MOTION BUILDS TOMORROW', W / 2, H * 0.86);
     });
-    mesh(new T.PlaneGeometry(0.24, 0.16), chest, 0, 0.88, 0.1262, body);
+    mesh(new T.PlaneGeometry(0.24, 0.16), chest, 0, 0.2, 0.1262, 'spine');
     const back = decal(0.22, 0.2, (g, W, H) => {
-      g.fillStyle = '#1B1C1E'; for (let i = 0; i < 5; i++) g.fillRect(W * 0.18, H * (0.08 + i * 0.07), W * 0.64, H * 0.035);
+      g.fillStyle = paint.ink; for (let i = 0; i < 5; i++) g.fillRect(W * 0.18, H * (0.08 + i * 0.07), W * 0.64, H * 0.035);
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${H * 0.09}px "Helvetica Neue", Arial, sans-serif`;
       ['EXPLORE', 'LEARN', 'EXPERIENCE'].forEach((w, i) => g.fillText(w, W / 2, H * (0.56 + i * 0.13)));
     });
-    const bk = mesh(new T.PlaneGeometry(0.22, 0.2), back, 0, 0.87, -0.1262, body); bk.rotation.y = Math.PI;
-    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) mesh(new T.SphereGeometry(0.008, 8, 6), M.silver, sx * 0.14, 0.86 + sy * 0.13, 0.126, body);
-    // Neck.
-    mesh(new T.CylinderGeometry(0.07, 0.08, 0.09, 24), M.black, 0, 1.085, 0, body);
-    for (let i = 0; i < 3; i++) mesh(new T.TorusGeometry(0.075, 0.006, 6, 24), M.silver, 0, 1.06 + i * 0.025, 0, body).rotation.x = Math.PI / 2;
-
-    // Head: flared silver base ring, yellow face drum, white band, yellow dome, eyes and eyebrow light bars.
-    const head = new T.Group(); head.position.y = 1.12; body.add(head);
+    mesh(new T.PlaneGeometry(0.22, 0.2), back, 0, 0.19, -0.1262, 'spine').rotation.y = Math.PI;
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) mesh(new T.SphereGeometry(0.008, 8, 6), M.trim, sx * 0.14, 0.18 + sy * 0.13, 0.126, 'spine');
+    mesh(new T.CylinderGeometry(0.07, 0.08, 0.09, 24), M.black, 0, 0.035, 0, 'neck');
+    for (let i = 0; i < 3; i++) mesh(new T.TorusGeometry(0.075, 0.006, 6, 24), M.trim, 0, 0.01 + i * 0.025, 0, 'neck').rotation.x = Math.PI / 2;
+    // Head: flared base ring, face drum, band, flattened dome and a ring of screws.
     const HR = 0.35;
-    mesh(new T.CylinderGeometry(HR + 0.02, HR - 0.02, 0.05, 56), M.silver, 0, 0.02, 0, head);
-    mesh(new T.CylinderGeometry(HR, HR, 0.17, 56), M.yellow, 0, 0.13, 0, head);
-    mesh(new T.CylinderGeometry(HR + 0.008, HR + 0.008, 0.04, 56), M.silver, 0, 0.235, 0, head);
-    const dome = mesh(new T.SphereGeometry(HR, 56, 20, 0, Math.PI * 2, 0, Math.PI / 2), M.yellow, 0, 0.255, 0, head); dome.scale.y = 0.48;
-    for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; mesh(new T.SphereGeometry(0.007, 8, 6), M.black, Math.sin(a) * (HR + 0.01), 0.235, Math.cos(a) * (HR + 0.01), head); }
-    [-1, 1].forEach(s => {
-      const e = new T.Group(); e.position.set(s * 0.165, 0.13, 0.31); head.add(e);
-      mesh(cylZ(0.128, 0.134, 0.13), M.black, 0, 0, 0.0, e);
-      mesh(new T.TorusGeometry(0.124, 0.007, 8, 48), M.silver, 0, 0, 0.066, e);
-      mesh(cylZ(0.112, 0.112, 0.02), M.black, 0, 0, 0.058, e);
-      mesh(new T.SphereGeometry(0.1, 32, 16), M.lens, 0, 0, 0.03, e).scale.z = 0.42;
-      mesh(new T.TorusGeometry(0.068, 0.006, 8, 48), M.glow, 0, 0, 0.066, e);
-      mesh(new T.TorusGeometry(0.03, 0.003, 6, 32), M.glow, 0, 0, 0.071, e);
-      mesh(new T.SphereGeometry(0.013, 12, 8), M.led, -0.035, 0.035, 0.07, e);
+    mesh(new T.CylinderGeometry(HR + 0.02, HR - 0.02, 0.05, 56), M.trim, 0, 0.02, 0, 'head');
+    mesh(new T.CylinderGeometry(HR, HR, 0.17, 56), M.paint, 0, 0.13, 0, 'head');
+    mesh(new T.CylinderGeometry(HR + 0.008, HR + 0.008, 0.04, 56), M.trim, 0, 0.235, 0, 'head');
+    mesh(new T.SphereGeometry(HR, 56, 20, 0, Math.PI * 2, 0, Math.PI / 2), M.paint, 0, 0.255, 0, 'head').scale.y = 0.48;
+    for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; mesh(new T.SphereGeometry(0.007, 8, 6), M.black, Math.sin(a) * (HR + 0.01), 0.235, Math.cos(a) * (HR + 0.01), 'head'); }
+    // Eyes: deep black housing, thin bezel, and a round screen that draws the expression, under a glass cover.
+    const ec = document.createElement('canvas'); ec.width = ec.height = 256; const eg = ec.getContext('2d');
+    const eyeTex = new T.CanvasTexture(ec); eyeTex.encoding = T.sRGBEncoding;
+    const eyeMat = new T.MeshBasicMaterial({ map: eyeTex, toneMapped: false });
+    ['L', 'R'].forEach(n => {
+      const e = 'eye' + n;
+      mesh(cylZ(0.128, 0.134, 0.13), M.black, 0, 0, 0, e);
+      mesh(new T.TorusGeometry(0.124, 0.007, 8, 48), M.trim, 0, 0, 0.066, e);
+      mesh(new T.CircleGeometry(0.11, 48), eyeMat, 0, 0, 0.0655, e);
+      const cover = mesh(new T.SphereGeometry(0.108, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.glass, 0, 0, 0.066, e);
+      cover.scale.set(1, 0.3, 1); cover.rotation.x = Math.PI / 2; cover.castShadow = false;
     });
-    const brows = [];
-    [-1, 1].forEach(s => {
-      const b = new T.Group(); b.position.set(s * 0.165, 0.3, 0.25); b.rotation.x = -0.3; head.add(b); brows.push(b);
-      mesh(rb(0.24, 0.055, 0.12, 0.014), M.black, 0, 0, 0, b);
-      mesh(new T.BoxGeometry(0.16, 0.012, 0.012), M.led, 0, 0.008, 0.061, b);
+    ['L', 'R'].forEach(n => {
+      mesh(rb(0.24, 0.055, 0.12, 0.014), M.black, 0, 0, 0, 'brow' + n);
+      mesh(new T.BoxGeometry(0.16, 0.012, 0.012), M.led, 0, 0.008, 0.061, 'brow' + n);
     });
-    // Arms: shoulder ball, thin black upper arm with a chrome piston, silver elbow, long yellow forearm shell with
-    // white cuffs, and a black two-finger gripper.
-    const arms = [-1, 1].map(s => {
-      const sh = new T.Group(); sh.position.set(s * 0.21, 0.98, 0); body.add(sh);
+    // Arms: shoulder ball, black upper arm with a chrome piston, elbow, forearm shell with cuffs and piston, gripper.
+    [['L', 1], ['R', -1]].forEach(([n, s]) => {
+      const sh = 'shoulder' + n, el = 'elbow' + n, wr = 'wrist' + n;
       mesh(new T.SphereGeometry(0.05, 18, 12), M.black, 0, 0, 0, sh);
       mesh(new T.CylinderGeometry(0.022, 0.022, 0.24, 10), M.black, s * 0.012, -0.13, -0.015, sh);
       mesh(new T.CylinderGeometry(0.012, 0.012, 0.22, 10), M.chrome, s * 0.012, -0.13, 0.025, sh);
-      const el = new T.Group(); el.position.set(s * 0.012, -0.27, 0); sh.add(el);
-      mesh(new T.SphereGeometry(0.045, 18, 12), M.silver, 0, 0, 0, el);
-      mesh(rb(0.13, 0.31, 0.14, 0.035), M.yellow, 0, -0.19, 0.005, el);
-      mesh(rb(0.142, 0.045, 0.152, 0.014), M.silver, 0, -0.075, 0.005, el);
-      mesh(rb(0.142, 0.05, 0.152, 0.014), M.silver, 0, -0.33, 0.005, el);
+      mesh(new T.SphereGeometry(0.045, 18, 12), M.trim, 0, 0, 0, el);
+      mesh(rb(0.13, 0.31, 0.14, 0.035), M.paint, 0, -0.19, 0.005, el);
+      mesh(rb(0.142, 0.045, 0.152, 0.014), M.trim, 0, -0.075, 0.005, el);
+      mesh(rb(0.142, 0.05, 0.152, 0.014), M.trim, 0, -0.33, 0.005, el);
       mesh(new T.BoxGeometry(0.02, 0.16, 0.02), M.black, s * 0.066, -0.19, 0.06, el);
       mesh(new T.CylinderGeometry(0.012, 0.012, 0.16, 8), M.chrome, s * 0.066, -0.19, 0.035, el);
-      const hand = new T.Group(); hand.position.y = -0.37; el.add(hand);
-      mesh(rb(0.095, 0.07, 0.1, 0.018), M.black, 0, -0.02, 0.005, hand);
-      const fingers = [-1, 1].map(k => { const f = new T.Group(); f.position.set(0, -0.055, k * 0.034); hand.add(f); mesh(rb(0.05, 0.085, 0.024, 0.008), M.black, 0, -0.04, 0, f); return f; });
-      sh.rotation.z = s * 0.2; el.rotation.x = -0.25;
-      return { s, sh, el, hand, fingers };
+      mesh(rb(0.095, 0.07, 0.1, 0.018), M.black, 0, -0.02, 0.005, wr);
+      [1, 2].forEach(k => mesh(rb(0.05, 0.085, 0.024, 0.008), M.black, 0, -0.04, 0, 'finger' + n + k));
     });
 
-    let t = 0, g = null, gt = 0, look = 0;
-    const GEST = { Wave: 2.4, ThumbsUp: 1.6, Yes: 1.2 };
-    return {
-      root,
-      gesture(name) { const d = GEST[name]; if (!d) return 0; g = name; gt = 0; return d; },
+    // Joint markers for the rig view (hidden unless the rig is shown).
+    const jointM = new T.MeshBasicMaterial({ color: 0x19E6FF, depthTest: false, toneMapped: false }), joints = [];
+    Object.values(bones).forEach(b => { const j = new T.Mesh(new T.SphereGeometry(0.016, 10, 8), jointM); j.renderOrder = 20; j.visible = false; b.add(j); joints.push(j); });
+
+    // ---------------- Animation clips (rotations are offsets from the bind pose; every clip keys every bone)
+    const ANIM = ['hips', 'spine', 'neck', 'head', 'browL', 'browR', 'shoulderL', 'shoulderR', 'elbowL', 'elbowR', 'wristL', 'wristR',
+      'fingerL1', 'fingerL2', 'fingerR1', 'fingerR2', 'thighL', 'thighR', 'shinL', 'shinR'];
+    const qE = new T.Euler(), qQ = new T.Quaternion();
+    function clip(name, dur, keys, bob) {
+      const tracks = ANIM.map(b => {
+        const base = BASE[b] || [0, 0, 0], k = keys[b] || [[0, 0, 0, 0]], times = [], vals = [];
+        k.forEach(([t, x, y, z]) => { qQ.setFromEuler(qE.set(base[0] + x, base[1] + y, base[2] + z)); times.push(t); vals.push(qQ.x, qQ.y, qQ.z, qQ.w); });
+        if (times[times.length - 1] < dur) { times.push(dur); vals.push(...vals.slice(-4)); }
+        return new T.QuaternionKeyframeTrack('cg_' + b + '.quaternion', times, vals);
+      });
+      const bt = [], bv = []; (bob || [[0, 0], [dur, 0]]).forEach(([t, dy]) => { bt.push(t); bv.push(0, 0.62 + dy, 0); });
+      tracks.push(new T.VectorKeyframeTrack('cg_hips.position', bt, bv));
+      return new T.AnimationClip(name, dur, tracks);
+    }
+    const hold = (t0, t1, t2, t3, x, y, z) => [[t0, 0, 0, 0], [t1, x, y, z], [t2, x, y, z], [t3, 0, 0, 0]];
+    const wig = (t0, t1, n, amp, axis) => { const r = [[t0, 0, 0, 0]]; for (let i = 0; i <= n; i++) { const v = [0, 0, 0]; v[axis] = (i % 2 ? -1 : 1) * amp; r.push([t0 + (t1 - t0) * (i + 1) / (n + 2), ...v]); } r.push([t1, 0, 0, 0]); return r; };
+    const P2 = Math.PI / 2;
+    const CLIPS = [
+      clip('Idle', 4, {
+        spine: [[0, 0, 0, 0], [2, 0.015, 0, 0], [4, 0, 0, 0]], neck: [[0, 0, 0, 0], [2, 0.02, 0, 0], [4, 0, 0, 0]],
+        head: [[0, 0, 0, 0], [1.2, 0.03, 0.22, 0], [2.4, -0.02, -0.18, 0.03], [4, 0, 0, 0]],
+        shoulderL: [[0, 0, 0, 0], [2, 0.05, 0, 0.03], [4, 0, 0, 0]], shoulderR: [[0, 0, 0, 0], [2, 0.05, 0, -0.03], [4, 0, 0, 0]],
+        fingerL1: [[0, 0, 0, 0], [2, -0.05, 0, 0], [4, 0, 0, 0]], fingerR1: [[0, 0, 0, 0], [2, -0.05, 0, 0], [4, 0, 0, 0]]
+      }, [[0, 0], [2, 0.005], [4, 0]]),
+      clip('Roll', 1.2, {
+        spine: [[0, 0.08, 0, 0]], head: [[0, -0.06, 0, 0], [0.6, -0.04, 0, 0], [1.2, -0.06, 0, 0]],
+        shoulderL: [[0, -0.18, 0, 0], [0.6, 0.18, 0, 0], [1.2, -0.18, 0, 0]], shoulderR: [[0, 0.18, 0, 0], [0.6, -0.18, 0, 0], [1.2, 0.18, 0, 0]],
+        elbowL: [[0, -0.12, 0, 0]], elbowR: [[0, -0.12, 0, 0]], thighL: [[0, 0.04, 0, 0]], thighR: [[0, 0.04, 0, 0]], shinL: [[0, -0.04, 0, 0]], shinR: [[0, -0.04, 0, 0]]
+      }, [[0, 0], [0.3, 0.006], [0.6, 0], [0.9, 0.006], [1.2, 0]]),
+      clip('Wave', 2.4, {
+        shoulderR: hold(0, 0.45, 1.95, 2.4, -0.3, 0, -2.3), elbowR: wig(0.45, 1.95, 4, 0.45, 2), wristR: wig(0.55, 1.95, 4, 0.3, 1),
+        head: hold(0, 0.5, 1.9, 2.4, 0.05, -0.1, -0.14), spine: hold(0, 0.5, 1.9, 2.4, 0, 0, 0.04),
+        browL: hold(0, 0.4, 2, 2.4, -0.2, 0, 0), browR: hold(0, 0.4, 2, 2.4, -0.2, 0, 0),
+        fingerR1: hold(0, 0.5, 2, 2.4, -0.2, 0, 0), fingerR2: hold(0, 0.5, 2, 2.4, 0.2, 0, 0)
+      }),
+      clip('ThumbsUp', 1.8, {
+        shoulderL: hold(0, 0.4, 1.3, 1.8, -1.15, 0, 0), shoulderR: hold(0, 0.4, 1.3, 1.8, -1.15, 0, 0),
+        elbowL: hold(0, 0.4, 1.3, 1.8, -0.9, 0, 0), elbowR: hold(0, 0.4, 1.3, 1.8, -0.9, 0, 0),
+        fingerL1: hold(0, 0.4, 1.3, 1.8, 0.14, 0, 0), fingerL2: hold(0, 0.4, 1.3, 1.8, -0.14, 0, 0),
+        fingerR1: hold(0, 0.4, 1.3, 1.8, 0.14, 0, 0), fingerR2: hold(0, 0.4, 1.3, 1.8, -0.14, 0, 0),
+        head: [[0, 0, 0, 0], [0.5, 0.22, 0, 0], [0.7, -0.04, 0, 0], [0.9, 0.2, 0, 0], [1.1, 0, 0, 0]], spine: hold(0, 0.4, 1.3, 1.8, -0.05, 0, 0),
+        browL: hold(0, 0.4, 1.3, 1.8, -0.18, 0, 0), browR: hold(0, 0.4, 1.3, 1.8, -0.18, 0, 0)
+      }, [[0, 0], [0.5, 0.02], [0.7, 0], [0.9, 0.02], [1.1, 0], [1.8, 0]]),
+      clip('Yes', 1.2, {
+        head: [[0, 0, 0, 0], [0.25, 0.25, 0, 0], [0.5, -0.05, 0, 0], [0.75, 0.22, 0, 0], [1, 0, 0, 0]],
+        browL: hold(0, 0.2, 0.9, 1.2, -0.15, 0, 0), browR: hold(0, 0.2, 0.9, 1.2, -0.15, 0, 0)
+      }),
+      clip('Point', 2.2, {
+        shoulderR: hold(0, 0.45, 1.75, 2.2, -1.45, 0, 0.15), elbowR: hold(0, 0.45, 1.75, 2.2, 0.22, 0, 0),
+        fingerR1: hold(0, 0.45, 1.75, 2.2, 0.12, 0, 0), fingerR2: hold(0, 0.45, 1.75, 2.2, -0.12, 0, 0),
+        head: hold(0, 0.5, 1.7, 2.2, 0.08, -0.2, 0), spine: hold(0, 0.5, 1.7, 2.2, 0, -0.12, 0),
+        shoulderL: hold(0, 0.5, 1.7, 2.2, 0.15, 0, -0.1), browL: hold(0, 0.4, 1.8, 2.2, -0.15, 0, 0), browR: hold(0, 0.4, 1.8, 2.2, -0.15, 0, 0)
+      }),
+      clip('LookAround', 3.6, {
+        head: [[0, 0, 0, 0], [0.8, 0, 0.75, 0], [1.5, 0, 0.75, 0], [2.3, 0, -0.75, 0], [3, 0, -0.75, 0], [3.6, 0, 0, 0]],
+        spine: [[0, 0, 0, 0], [0.8, 0, 0.18, 0], [1.5, 0, 0.18, 0], [2.3, 0, -0.18, 0], [3, 0, -0.18, 0], [3.6, 0, 0, 0]],
+        browL: [[0, 0, 0, 0], [0.8, -0.12, 0, 0], [3, -0.12, 0, 0], [3.6, 0, 0, 0]], browR: [[0, 0, 0, 0], [0.8, -0.12, 0, 0], [3, -0.12, 0, 0], [3.6, 0, 0, 0]]
+      }),
+      clip('Celebrate', 3.2, {
+        spine: [[0, 0, 0, 0], [0.4, 0, 0, 0], [0.8, 0, P2, 0], [1.2, 0, 2 * P2, 0], [1.6, 0, 3 * P2, 0], [2, 0, 4 * P2, 0]],
+        shoulderL: hold(0, 0.4, 2.8, 3.2, 0, 0, 2.4), shoulderR: hold(0, 0.4, 2.8, 3.2, 0, 0, -2.4),
+        elbowL: wig(0.4, 2.8, 6, 0.4, 2), elbowR: wig(0.4, 2.8, 6, 0.4, 2),
+        head: hold(0, 0.4, 2.8, 3.2, -0.18, 0, 0), browL: hold(0, 0.4, 2.8, 3.2, -0.22, 0, 0), browR: hold(0, 0.4, 2.8, 3.2, -0.22, 0, 0),
+        fingerL1: hold(0, 0.4, 2.8, 3.2, -0.2, 0, 0), fingerL2: hold(0, 0.4, 2.8, 3.2, 0.2, 0, 0), fingerR1: hold(0, 0.4, 2.8, 3.2, -0.2, 0, 0), fingerR2: hold(0, 0.4, 2.8, 3.2, 0.2, 0, 0)
+      }, [[0, 0], [0.3, -0.03], [0.55, 0.03], [0.8, -0.03], [1.05, 0.03], [1.3, -0.03], [1.55, 0.03], [1.8, -0.03], [2.05, 0.03], [2.3, -0.02], [2.8, 0], [3.2, 0]])
+    ];
+    const mixer = new T.AnimationMixer(root), acts = {};
+    CLIPS.forEach(c => { acts[c.name] = mixer.clipAction(c); });
+    Object.keys(acts).forEach(k => { if (k !== 'Idle' && k !== 'Roll') { acts[k].setLoop(T.LoopOnce, 1); acts[k].clampWhenFinished = true; } });
+    acts.Idle.play(); acts.Roll.play(); acts.Roll.setEffectiveWeight(0);
+    const EXPR = { Wave: 'happy', ThumbsUp: 'happy', Yes: 'happy', Point: 'wide', LookAround: 'normal', Celebrate: 'heart' };
+
+    // ---------------- Eye screens
+    let eyeKey = '';
+    function drawEyes(expr, px, py) {
+      const key = expr + ':' + Math.round(px * 8) + ':' + Math.round(py * 8) + ':' + paint.eye;
+      if (key === eyeKey) return; eyeKey = key;
+      const g = eg, c = expr === 'heart' ? '#FF4FC3' : paint.eye, cx = 128 + px * 22, cy = 128 + py * 22;
+      g.shadowBlur = 0; g.fillStyle = '#030405'; g.fillRect(0, 0, 256, 256);
+      g.strokeStyle = c; g.fillStyle = c; g.lineCap = 'round'; g.shadowColor = c; g.shadowBlur = 22;
+      const ring = (r, w) => { g.lineWidth = w; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke(); };
+      if (expr === 'blink') { g.lineWidth = 12; g.beginPath(); g.moveTo(58, 132); g.lineTo(198, 132); g.stroke(); }
+      else if (expr === 'happy') { g.lineWidth = 15; g.beginPath(); g.arc(128, 158, 64, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); }
+      else if (expr === 'sleepy') { g.lineWidth = 12; g.beginPath(); g.arc(128, 100, 62, Math.PI * 0.15, Math.PI * 0.85); g.stroke(); }
+      else if (expr === 'heart') { g.beginPath(); g.moveTo(128, 200); g.bezierCurveTo(34, 140, 50, 56, 128, 94); g.bezierCurveTo(206, 56, 222, 140, 128, 200); g.fill(); }
+      else if (expr === 'wide') { ring(90, 8); ring(46, 7); g.beginPath(); g.arc(cx, cy, 14, 0, Math.PI * 2); g.fill(); }
+      else {
+        ring(74, 11); ring(32, 6);
+        if (expr === 'focus') { g.shadowBlur = 0; g.fillStyle = '#030405'; g.fillRect(0, 0, 256, 96); g.shadowBlur = 22; g.lineWidth = 8; g.beginPath(); g.moveTo(54, 96); g.lineTo(202, 96); g.stroke(); }
+      }
+      g.shadowBlur = 0;
+      if (expr === 'normal' || expr === 'wide') { g.fillStyle = 'rgba(255,255,255,0.85)'; g.beginPath(); g.arc(cx - 34, cy - 34, 9, 0, Math.PI * 2); g.fill(); }
+      eyeTex.needsUpdate = true;
+    }
+
+    let t = 0, cur = null, fading = false, rollW = 0, blinkT = 0, nextBlink = 3, forced = null, forcedT = 0;
+    const api = {
+      root, skeleton, bones, clips: CLIPS,
+      gesture(name) {
+        const a = acts[name]; if (!a) return 0;
+        if (cur && acts[cur] !== a) acts[cur].stop();
+        a.reset(); a.setEffectiveWeight(1); a.fadeIn(0.2); a.play(); cur = name; fading = false;
+        return a.getClip().duration;
+      },
+      express(name, secs) { forced = name; forcedT = secs || 2; },
+      setColor(id) {
+        paint = PAINTS[id] || PAINTS.yellow;
+        M.paint.color.setHex(paint.paint); M.paint.roughness = paint.rough; M.paint.metalness = paint.metal;
+        M.trim.color.setHex(paint.trim); M.glow.color.set(paint.eye); M.led.color.setHex(paint.led);
+        decals.forEach(d => d.redraw()); eyeKey = '';
+      },
+      // Rig view: joints shown through the shell, which turns see-through.
+      showRig(on) {
+        joints.forEach(j => { j.visible = on; });
+        SHELL.forEach(m => { m.transparent = on; m.opacity = on ? 0.35 : 1; m.depthWrite = !on; m.needsUpdate = true; });
+      },
       update(dt, speed) {
         t += dt;
-        const run = Math.min(1, speed / 3), sw = Math.sin(t * 5 * (0.6 + run));
-        wheels.forEach(w => { w.rotation.x += speed * dt / 0.11; });
-        body.rotation.x += ((0.07 * run) - body.rotation.x) * Math.min(1, dt * 4);
-        body.position.y = speed > 0.2 ? Math.abs(Math.sin(t * 9)) * 0.006 : Math.sin(t * 1.6) * 0.004;
-        // Head: looks round a little when standing, forward when rolling.
-        look += ((speed > 0.3 ? 0 : Math.sin(t * 0.45) * 0.35) - look) * Math.min(1, dt * 2);
-        head.rotation.y = look; head.rotation.x = 0.04 * Math.sin(t * 0.7);
-        arms.forEach(a => {
-          a.sh.rotation.x = speed > 0.3 ? a.s * sw * 0.18 * (0.4 + run) : Math.sin(t * 1.3 + a.s) * 0.04;
-          a.sh.rotation.z = a.s * (0.2 + 0.03 * Math.sin(t * 1.1)); a.el.rotation.x = -0.25; a.el.rotation.z = 0; a.hand.rotation.y = 0;
-          a.fingers.forEach((f, k) => { f.rotation.x = (k ? -1 : 1) * 0.12; });
-        });
-        // Gestures on top of the base pose.
-        if (g) {
-          gt += dt; const d = GEST[g], u = Math.min(1, gt / d), env = Math.sin(Math.PI * Math.min(1, u * 1.15));
-          if (g === 'Wave') {
-            const a = arms[0];
-            a.sh.rotation.z = a.s * (0.2 + env * 2.3); a.sh.rotation.x = -env * 0.3;
-            a.el.rotation.z = a.s * Math.sin(gt * 9) * 0.45 * env; a.hand.rotation.y = Math.sin(gt * 9) * 0.3 * env;
-            head.rotation.z = -0.12 * env;
-          } else if (g === 'ThumbsUp') {
-            arms.forEach(a => { a.sh.rotation.x = -1.1 * env; a.el.rotation.x = -0.25 - 0.9 * env; });
-            head.rotation.x = 0.18 * Math.sin(gt * 8) * env;
-          } else head.rotation.x = 0.2 * Math.sin(gt * 9) * env;
-          if (u >= 1) g = null;
-        } else head.rotation.z = 0;
-        // Eyes: a slow breathing glow and an occasional blink (the lens rings dim); eyebrows lift on a gesture.
-        const blink = (t % 4.3) < 0.12 ? 0.25 : 1, k = (0.85 + 0.15 * Math.sin(t * 2.2)) * blink;
-        M.glow.color.setRGB(1 * k, 0.6 * k, 0.18 * k);
-        brows.forEach(b => { b.position.y = 0.3 + (g ? 0.015 : 0); });
+        rollW += (Math.min(1, speed / 1.2) - rollW) * Math.min(1, dt * 6);
+        let gw = 0;
+        if (cur) {
+          const a = acts[cur];
+          if (!fading && a.time > a.getClip().duration - 0.3) { a.fadeOut(0.3); fading = true; }
+          gw = a.getEffectiveWeight();
+          if (fading && (gw < 0.01 || !a.isRunning())) { a.stop(); cur = null; gw = 0; }
+        }
+        acts.Idle.setEffectiveWeight((1 - rollW) * (1 - gw)); acts.Roll.setEffectiveWeight(rollW * (1 - gw));
+        acts.Roll.timeScale = 0.6 + Math.min(1.6, speed / 2.5);
+        mixer.update(dt);
+        bones.wheelL.rotation.x += speed * dt / 0.11; bones.wheelR.rotation.x += speed * dt / 0.11;
+        // Expression: focused while rolling, from the gesture while one plays, blinking now and then.
+        let expr = rollW > 0.5 ? 'focus' : 'normal';
+        if (cur && !fading) expr = EXPR[cur] || expr;
+        if (forcedT > 0) { forcedT -= dt; expr = forced; }
+        nextBlink -= dt;
+        if (nextBlink < 0) { blinkT = 0.13; nextBlink = 2.5 + Math.random() * 3; }
+        if (blinkT > 0) { blinkT -= dt; if (expr === 'normal' || expr === 'focus') expr = 'blink'; }
+        const hy = bones.head.rotation.y + bones.spine.rotation.y * 0.5;
+        drawEyes(expr, Math.max(-1, Math.min(1, hy * 1.3 + (cur ? 0 : Math.sin(t * 0.5) * 0.25))), rollW > 0.5 ? 0.2 : 0);
       }
     };
+    api.setColor('yellow');
+    return api;
   }
 
   // ------------------------------------------------ A person: hips, two-part legs and arms, torso, head and hair.
@@ -5338,7 +5470,7 @@ CFT.loadModels = onProgress => {
       x.font = '600 30px "Helvetica Neue", Helvetica, Arial, sans-serif'; x.fillStyle = '#FFFFFF'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('CFT GUIDE', 128, 32);
       const tagTex = new T.CanvasTexture(c); tagTex.encoding = T.sRGBEncoding;
       const tag = new T.Sprite(new T.SpriteMaterial({ map: tagTex, depthWrite: false })); tag.scale.set(0.62, 0.155, 1); tag.position.y = 1.8; g.add(tag);
-      guide = { g, bot, oneShot: 0, pos: V(0, FLOOR, 30), heading: Math.PI, speed: 0, stuck: 0, placed: false, route: null, refresh: 0, waved: '', stop: '' };
+      guide = { g, bot, oneShot: 0, idle: 0, pos: V(0, FLOOR, 30), heading: Math.PI, speed: 0, stuck: 0, placed: false, route: null, refresh: 0, waved: '', stop: '' };
     }
     function gesture(name) {
       if (!guide) return;
@@ -5382,7 +5514,7 @@ CFT.loadModels = onProgress => {
           tx = s.x - s.dz * 0.9; tz = s.z + s.dx * 0.9;
           atStop = s.end;
           const key = Math.round(r[r.length - 1].x) + ',' + Math.round(r[r.length - 1].z);
-          if (gd.stop && key !== gd.stop && Math.hypot(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z) < 8) gesture('ThumbsUp');   // on to the next stop
+          if (gd.stop && key !== gd.stop && Math.hypot(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z) < 8) gesture('Point');   // this way to the next stop
           gd.stop = key;
           if (atStop && gd.waved !== key && Math.hypot(tx - gd.pos.x, tz - gd.pos.z) < 1) { gd.waved = key; gesture('Wave'); }
         } else {
@@ -5406,7 +5538,11 @@ CFT.loadModels = onProgress => {
         if (!moving) gd.heading = turn(gd.heading, Math.atan2(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z), Math.min(1, dt * 3));
       }
       if (gd.oneShot > 0) gd.oneShot -= dt;
+      // Standing about for a while: it looks round the hall.
+      gd.idle = moving > 0.25 || gd.oneShot > 0 ? 0 : gd.idle + dt;
+      if (gd.idle > 8) { gd.idle = 0; gesture('LookAround'); }
       gd.bot.update(dt, moving);
+      if (rigHelper) rigHelper.visible = gd.g.visible;
       gd.g.position.copy(gd.pos); gd.g.rotation.y = gd.heading;
     }
 
@@ -5428,6 +5564,23 @@ CFT.loadModels = onProgress => {
       meLast.copy(p.pos);
     };
     people.wave = () => gesture('Wave');
+    people.gesture = name => gesture(name);
+    people.guideBot = () => guide && guide.bot;   // for scripted checks of the rig
+    // A reaction to the visit: a thumbs-up for each installation, a spin with heart eyes when the tour is complete.
+    people.react = kind => { if (guide && guide.g.visible) gesture(kind === 'complete' ? 'Celebrate' : 'ThumbsUp'); };
+    people.setGuideColor = id => { if (guide) guide.bot.setColor(id); };
+    // Rig view: the skeleton's bones drawn over the see-through robot.
+    let rigHelper = null;
+    people.showRig = on => {
+      if (!guide) return;
+      guide.bot.showRig(on);
+      if (on && !rigHelper) {
+        rigHelper = new T.SkeletonHelper(guide.bot.root);
+        rigHelper.material.depthTest = false; rigHelper.material.transparent = true; rigHelper.renderOrder = 19;
+        scene.add(rigHelper);
+      }
+      if (!on && rigHelper) { scene.remove(rigHelper); rigHelper = null; }
+    };
     loadGuide();
     return people;
   };
@@ -5474,7 +5627,7 @@ CFT.loadModels = onProgress => {
   const G = CFT.G = {
     state: {
       progress: freshProgress(),
-      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'night', seaSky: true, nightSky: true, view: 'first', guide: true, crowd: true }, saved && saved.settings, saved && saved.settings && !saved.settings.nightSky ? { sky: 'night', seaSky: true, nightSky: true } : null)
+      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'night', seaSky: true, nightSky: true, view: 'first', guide: true, crowd: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.nightSky ? { sky: 'night', seaSky: true, nightSky: true } : null)
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     player: { pos: new T.Vector3(0, 0, 54), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
@@ -5665,10 +5818,12 @@ CFT.loadModels = onProgress => {
     if (ex.data.bonus) UI().toast(`Expansion hall ${G.bonusVisited()} of ${BONUS.length}`, `${ex.data.name} added to your journal.`);
     else UI().toast(`Installation ${G.requiredVisited()} of ${REQ.length}`, `${ex.data.name} added to your journal.`);
     G.award('first');
+    if (G.people && G.people.react) G.people.react('visited');
     if (BONUS.length && BONUS.every(k => p.visited[k])) G.award('expansion');
     updateBeacon();
     if (allReq(p.visited) && !p.tourComplete) {
       p.tourComplete = true;
+      if (G.people && G.people.react) G.people.react('complete');
       if (p.mode === 'guided') G.award('guided');
       setTimeout(() => {
         UI().say(CFT.NARRATION.complete);
@@ -5990,6 +6145,8 @@ CFT.loadModels = onProgress => {
     if (!G.people) return;
     G.people.guideOn = G.state.settings.guide !== false;
     G.people.crowdOn = G.state.settings.crowd !== false;
+    if (G.people.setGuideColor) G.people.setGuideColor(G.state.settings.guideColor || 'yellow');
+    if (G.people.showRig) G.people.showRig(!!G.state.settings.guideRig);
   };
   function placePlayer(x, y, z, yaw, pitch) {
     const p = G.player;
