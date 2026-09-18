@@ -2834,9 +2834,29 @@ CFT.loadModels = onProgress => {
     // No city skyline any more: the museum stands on a platform out at sea (see buildSea), in a soft sea haze.
     scene.background = new T.Color(0xBFD6E4);
     scene.fog = new T.Fog(0xAFCADC, 160, 1500);
-    scene.add(new T.HemisphereLight(0xE4F0F7, 0x3A4A50, 0.55));
+    const hemi = new T.HemisphereLight(0xE4F0F7, 0x3A4A50, 0.55); scene.add(hemi);
     const sun = new T.DirectionalLight(0xFFF6EA, 0.9);
     sun.position.set(-60, 110, 80); scene.add(sun);
+    return { hemi, sun };
+  }
+  // Night sky (the user's top-down night plan): deep navy overhead fading to a faint teal glow at the horizon,
+  // stars, a soft moon, and a dark sea below.
+  function nightSkyURL() {
+    const c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
+    const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 1024);
+    gr.addColorStop(0, '#01030A'); gr.addColorStop(0.3, '#040B1C'); gr.addColorStop(0.45, '#0B1E33'); gr.addColorStop(0.5, '#143047');
+    gr.addColorStop(0.53, '#061423'); gr.addColorStop(1, '#010409');
+    g.fillStyle = gr; g.fillRect(0, 0, 2048, 1024);
+    for (let i = 0; i < 1400; i++) {
+      const x = Geo.hash(i, 1, 91) * 2048, y = Math.pow(Geo.hash(i, 2, 91), 1.4) * 470, b = Geo.hash(i, 3, 91);
+      g.fillStyle = `rgba(${220 + b * 35 | 0},${230 + b * 25 | 0},255,${(0.25 + b * 0.75) * (1 - y / 520)})`;
+      g.fillRect(x, y, b > 0.93 ? 2.2 : 1.2, b > 0.93 ? 2.2 : 1.2);
+    }
+    const mx = 1500, my = 250, mg = g.createRadialGradient(mx, my, 0, mx, my, 120);
+    mg.addColorStop(0, 'rgba(200,225,255,0.35)'); mg.addColorStop(1, 'rgba(200,225,255,0)');
+    g.fillStyle = mg; g.fillRect(mx - 120, my - 120, 240, 240);
+    g.fillStyle = '#EAF2FF'; g.beginPath(); g.arc(mx, my, 16, 0, Math.PI * 2); g.fill();
+    return c.toDataURL('image/jpeg', 0.92);
   }
   // Sea-haze sky, painted as an equirectangular picture: pale grey-blue overhead, a bright hazy band at the
   // horizon, and grey-green sea below it (hidden by the water plane, but it colours reflections).
@@ -3726,7 +3746,7 @@ CFT.loadModels = onProgress => {
     // Raised hull under the deck (the user's station render): a tapering grey hull with a lit window band, eight
     // big legs on pontoons at the water line, each with a glowing thruster, and the CFT KINETIC name on the front.
     const hullM = new T.MeshStandardMaterial({ color: 0x6E777F, roughness: 0.5, metalness: 0.45 });
-    const bandM = new T.MeshStandardMaterial({ color: 0x14202A, emissive: 0x3FB8E8, emissiveIntensity: 0.45, roughness: 0.2, metalness: 0.6 });
+    const bandM = world.bandM = new T.MeshStandardMaterial({ color: 0x14202A, emissive: 0x3FB8E8, emissiveIntensity: 0.45, roughness: 0.2, metalness: 0.6 });
     const thrM = new T.MeshBasicMaterial({ color: 0x8FFFF4, toneMapped: false });
     const wHalo = new T.MeshBasicMaterial({ map: TX.glow, color: 0x5FF0FF, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false });
     A.add(new T.CylinderGeometry(R - 2, R - 10, 5.4, 8), hullM, cx, -6.1, cz, Math.PI / 8);
@@ -3816,6 +3836,24 @@ CFT.loadModels = onProgress => {
     // more stand further out to sea.
     const deckM = new T.MeshStandardMaterial({ color: 0xDADFE3, roughness: 0.5, metalness: 0.2 });
     const domeM = new T.MeshStandardMaterial({ color: 0xF2F4F6, roughness: 0.2, metalness: 0.3 });
+    // Outdoor surfaces that setNight darkens (they would otherwise keep the bright daytime reflections).
+    world.outdoor = [M.paving, M.clad, hullM, deckM, domeM];
+    // Lamp posts round the deck; their light pools on the paving show only at night.
+    const postM = new T.MeshStandardMaterial({ color: 0x3A4148, roughness: 0.4, metalness: 0.6 });
+    const nightPools = new T.Group(); nightPools.visible = false; scene.add(nightPools);
+    const poolM = new T.MeshBasicMaterial({ map: TX.pool, color: 0xBFE6FF, transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false });
+    [[46, 20], [62, 28], [76, 36]].forEach(([r, n]) => {
+      for (let i = 0; i < n; i++) {
+        const a = (i + 0.5) / n * Math.PI * 2, x = cx + Math.sin(a) * r, z = cz + Math.cos(a) * r;
+        if (!onDeck(x, z, 3) || (x > BLD.x0 - 3 && x < BLD.x1 + 3 && z > BLD.z0 - 3 && z < 50)) continue;
+        if (SEA.BZ.some(dz => Math.abs(z - cz - dz) < SEA.BW) && Math.abs(x - cx) > SEA.apo - 8) continue;
+        A.add(new T.CylinderGeometry(0.06, 0.09, 3.6, 8), postM, x, 1.8, z);
+        A.add(new T.CylinderGeometry(0.28, 0.28, 0.08, 16), M.glowWarm, x, 3.62, z);
+        world.colliders.push({ x, z, r: 0.2 });
+        const p = new T.Mesh(new T.PlaneGeometry(9, 9), poolM); p.rotation.x = -Math.PI / 2; p.position.set(x, 0.03, z); p.renderOrder = 2; nightPools.add(p);
+      }
+    });
+    world.nightPools = nightPools;
     const far = new Geo.Batch();
     const station = (x, z, r, y0) => {
       far.add(new T.CylinderGeometry(r, r, 1.6, 8), deckM, x, y0 - 0.8, z, Math.PI / 8);
@@ -3886,12 +3924,13 @@ CFT.loadModels = onProgress => {
   CFT.buildWorld = function (renderer, scene) {
     const TX = CFT.Tex.make(), M = makeMaterials(TX), D = makeDecals(), A = new Geo.Batch();
     // The painted sea-haze sky comes first and is the default; the city panoramas stay selectable.
-    CFT.SKIES = Object.assign({ sea: seaSkyURL() }, CFT.SKIES || {});
+    // The night sky is the default; the day sea haze and the city panoramas stay selectable (Sky, pause menu).
+    CFT.SKIES = Object.assign({ night: nightSkyURL(), sea: seaSkyURL() }, CFT.SKIES || {});
     const world = {
       FLOOR, TOP, HALL, LOBBY_R, rooms: ROOMS, exhibits: [], colliders: [], kiosks: [], anchors: [], animated: [],
       doors: null, beacon: null, reflector: null, floorMats: [], quality: 'high'
     };
-    buildEnvironment(renderer, scene);
+    world.env = buildEnvironment(renderer, scene);
 
     // Interior floor: reflective plane under a translucent marble layer (high quality).
     if (T.Reflector) {
@@ -4005,6 +4044,7 @@ CFT.loadModels = onProgress => {
       if (!world.skies.length) return;
       if (!CFT.SKIES[id]) id = world.skies.includes('sea') ? 'sea' : world.skies[0];
       world.sky = id;
+      world.setNight(id === 'night' || id === 'shanghai');
       // The sea reflects whichever sky is up (a prefiltered copy, so the rough swell blurs it).
       const show = c => { scene.background = c.tex; if (world.water) { world.water.material.envMap = c.env; world.water.material.needsUpdate = true; } };
       if (skyCache[id]) { show(skyCache[id]); return; }
@@ -4013,6 +4053,25 @@ CFT.loadModels = onProgress => {
         const pm = new T.PMREMGenerator(renderer), c = skyCache[id] = { tex: t, env: pm.fromEquirectangular(t).texture }; pm.dispose();
         if (world.sky === id) show(c);
       });
+    };
+
+    // Night: dim moonlight instead of the sun, a dark sea and haze, and the station's light bands, floor lines and
+    // wall seams glowing brighter (renderer exposure and bloom follow world.night in the render loop).
+    const DAY = { fog: scene.fog.color.getHex(), bg: 0xBFD6E4, stone: M.stone.emissiveIntensity, floor: M.floor.emissiveIntensity };
+    world.setNight = function (on) {
+      world.night = on;
+      const { hemi, sun } = world.env;
+      hemi.intensity = on ? 0.2 : 0.55; hemi.color.setHex(on ? 0x5A7AA8 : 0xE4F0F7); hemi.groundColor.setHex(on ? 0x0A1018 : 0x3A4A50);
+      sun.intensity = on ? 0.28 : 0.9; sun.color.setHex(on ? 0x9DB8E8 : 0xFFF6EA);
+      scene.fog.color.setHex(on ? 0x07121F : DAY.fog); scene.fog.near = on ? 120 : 160; scene.fog.far = on ? 1100 : 1500;
+      if (world.water) { world.water.material.color.setHex(on ? 0x020A14 : 0x05243A); world.water.material.envMapIntensity = on ? 1 : 0.6; }
+      if (world.bandM) world.bandM.emissiveIntensity = on ? 1.6 : 0.45;
+      M.stone.emissiveIntensity = DAY.stone * (on ? 2.2 : 1); M.floor.emissiveIntensity = DAY.floor * (on ? 2.5 : 1);
+      (world.outdoor || []).forEach(m => {
+        const d = m.userData.day || (m.userData.day = { env: m.envMapIntensity, col: m.color.getHex() });
+        m.envMapIntensity = d.env * (on ? 0.22 : 1); m.color.setHex(d.col); if (on) m.color.multiplyScalar(0.6);
+      });
+      if (world.nightPools) world.nightPools.visible = on;
     };
 
     world.setQuality = function (q) {
@@ -4170,7 +4229,7 @@ CFT.loadModels = onProgress => {
     const s = Math.min(w / 84, h / 84);
     return { s, cx: w / 2, cy: h / 2 - 10 * s };
   };
-  CFT.SKY_NAMES = { sea: 'Open sea · haze', johannesburg: 'Johannesburg skyline · sunset', dusseldorf: 'Düsseldorf harbour · blue hour', shanghai: 'Shanghai Bund · night' };
+  CFT.SKY_NAMES = { night: 'Night sea · stars', sea: 'Open sea · day', johannesburg: 'Johannesburg skyline · sunset', dusseldorf: 'Düsseldorf harbour · blue hour', shanghai: 'Shanghai Bund · night' };
 
   // Map colours: the paper plan (lobby kiosk) and the dark holographic plan (map overlay and on-screen minimap).
   const MAP_PAPER = { site: '#D9DEE2', porch: '#C6CDD2', ink: '#15191D', bld: '#FFFFFF', pav: '#AEB6BC', hall: '#F3F5F6', room: '#FFFFFF', svc: '#ECEFF1', hover: '#FFF1C2', seen: '#E1E6E9',
@@ -5270,7 +5329,7 @@ CFT.loadModels = onProgress => {
   const G = CFT.G = {
     state: {
       progress: freshProgress(),
-      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sea', seaSky: true, view: 'first', guide: true, crowd: true }, saved && saved.settings, saved && saved.settings && !saved.settings.seaSky ? { sky: 'sea', seaSky: true } : null)
+      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'night', seaSky: true, nightSky: true, view: 'first', guide: true, crowd: true }, saved && saved.settings, saved && saved.settings && !saved.settings.nightSky ? { sky: 'night', seaSky: true, nightSky: true } : null)
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     player: { pos: new T.Vector3(0, 0, 54), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
@@ -6147,6 +6206,9 @@ CFT.loadModels = onProgress => {
     if (G.people) G.people.update(dt, { phase: G.phase, player: G.player, camera, thirdPerson: G.state.settings.view === 'third', routePoints: G.routePoints });
     UI().tick(dt);
     if (UI().isOpen('map')) UI().drawMap();
+    const night = !!(G.world && G.world.night);
+    renderer.toneMappingExposure = night ? 1.0 : 0.82;
+    if (post) post.bloom.strength = night ? 0.8 : 0.45;
     if (G.usePost) post.c.render(dt); else renderer.render(scene, camera);
     // Step graphics down while the frame rate stays low: on the title and intro too, so a slower machine does not sit
     // on a frozen-looking screen. A single long frame counts as at most one second.
