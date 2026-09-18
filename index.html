@@ -2832,8 +2832,8 @@ CFT.loadModels = onProgress => {
       scene.add(new T.Points(sg, new T.PointsMaterial({ color: 0xCFD8E6, size: 1.3, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.8 })));
     }
     // No city skyline any more: the museum stands on a platform out at sea (see buildSea), in a soft sea haze.
-    scene.background = new T.Color(0xC3CFD2);
-    scene.fog = new T.Fog(0xAEBDC0, 120, 1100);
+    scene.background = new T.Color(0xBFD6E4);
+    scene.fog = new T.Fog(0xAFCADC, 160, 1500);
     scene.add(new T.HemisphereLight(0xE4F0F7, 0x3A4A50, 0.55));
     const sun = new T.DirectionalLight(0xFFF6EA, 0.9);
     sun.position.set(-60, 110, 80); scene.add(sun);
@@ -2843,14 +2843,14 @@ CFT.loadModels = onProgress => {
   function seaSkyURL() {
     const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
     const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 512);
-    gr.addColorStop(0, '#8FA7B4'); gr.addColorStop(0.32, '#B5C6CD'); gr.addColorStop(0.47, '#D6DFDF'); gr.addColorStop(0.5, '#C9D3D1');
-    gr.addColorStop(0.56, '#6F8584'); gr.addColorStop(1, '#2C3E40');
+    gr.addColorStop(0, '#4F84BD'); gr.addColorStop(0.3, '#8DB6DA'); gr.addColorStop(0.46, '#CFE2EE'); gr.addColorStop(0.5, '#BFD6E4');
+    gr.addColorStop(0.56, '#2E6189'); gr.addColorStop(1, '#0C2C45');
     g.fillStyle = gr; g.fillRect(0, 0, 1024, 512);
     // Soft cloud banks.
     for (let i = 0; i < 70; i++) {
       const x = Geo.hash(i, 1, 71) * 1024, y = 60 + Geo.hash(i, 2, 71) * 170, r = 40 + Geo.hash(i, 3, 71) * 120;
       const cg = g.createRadialGradient(x, y, 0, x, y, r);
-      cg.addColorStop(0, 'rgba(235,240,242,0.22)'); cg.addColorStop(1, 'rgba(235,240,242,0)');
+      cg.addColorStop(0, 'rgba(240,246,250,0.07)'); cg.addColorStop(1, 'rgba(240,246,250,0)');
       g.fillStyle = cg; g.fillRect(x - r, y - r, r * 2, r * 2);
     }
     return c.toDataURL('image/jpeg', 0.9);
@@ -3694,7 +3694,7 @@ CFT.loadModels = onProgress => {
   // The museum stands on a big octagonal platform out at sea: a pale deck with a glass rail and a light line round
   // its edge, a lower dock ring below it, then open water with glowing buoys tethered to the platform, drones
   // circling overhead and more stations far off in the haze.
-  const SEA = { cx: 0, cz: 15, R: 88, water: -2.2 };
+  const SEA = { cx: 0, cz: 15, R: 88, water: -11 };   // the deck is raised well above the sea on legs
   SEA.apo = SEA.R * Math.cos(Math.PI / 8);
   // Inside the deck's octagon (flat sides facing the four axes), m metres in from its edge.
   const onDeck = (x, z, m) => {
@@ -3705,7 +3705,36 @@ CFT.loadModels = onProgress => {
     const { cx, cz, R } = SEA, oct = k => { const f = Math.PI / 8 + k * Math.PI / 4; return [cx + Math.sin(f) * R, cz + Math.cos(f) * R]; };
     // Deck and the dock ring below it.
     A.add(new T.CylinderGeometry(R, R, 3.4, 8), M.paving, cx, -1.7, cz, Math.PI / 8);
-    A.add(new T.CylinderGeometry(R + 6, R + 7, 1.2, 8), M.base, cx, SEA.water + 0.3, cz, Math.PI / 8);
+    // Raised hull under the deck (the user's station render): a tapering grey hull with a lit window band, eight
+    // big legs on pontoons at the water line, each with a glowing thruster, and the CFT KINETIC name on the front.
+    const hullM = new T.MeshStandardMaterial({ color: 0x6E777F, roughness: 0.5, metalness: 0.45 });
+    const bandM = new T.MeshStandardMaterial({ color: 0x14202A, emissive: 0x3FB8E8, emissiveIntensity: 0.45, roughness: 0.2, metalness: 0.6 });
+    const thrM = new T.MeshBasicMaterial({ color: 0x8FFFF4, toneMapped: false });
+    const wHalo = new T.MeshBasicMaterial({ map: TX.glow, color: 0x5FF0FF, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false });
+    A.add(new T.CylinderGeometry(R - 2, R - 10, 5.4, 8), hullM, cx, -6.1, cz, Math.PI / 8);
+    A.add(new T.CylinderGeometry(R - 2.9, R - 3.9, 1.1, 8, 1, true), bandM, cx, -4.5, cz, Math.PI / 8);
+    A.add(new T.CylinderGeometry(R - 5.6, R - 6.4, 0.5, 8, 1, true), bandM, cx, -6.9, cz, Math.PI / 8);
+    for (let k = 0; k < 8; k++) {
+      const f = Math.PI / 4 + k * Math.PI / 4, lx = cx + Math.sin(f) * (R - 16), lz = cz + Math.cos(f) * (R - 16);
+      A.add(new T.BoxGeometry(8, -8.8 - SEA.water + 1, 8), hullM, lx, (SEA.water - 1 - 8.8) / 2, lz, f);
+      A.add(Geo.roundedBox(12, 3.2, 12, 0.6), hullM, lx, SEA.water + 0.6, lz, f);
+      // Thruster pointing out to sea, glowing on the water.
+      const tx = lx + Math.sin(f) * 7.2, tz = lz + Math.cos(f) * 7.2;
+      A.add(new T.CylinderGeometry(1.1, 1.4, 2.4, 16), hullM, tx, SEA.water + 0.7, tz, f, Math.PI / 2);
+      A.add(new T.CircleGeometry(1.0, 20), thrM, lx + Math.sin(f) * 8.45, SEA.water + 0.7, lz + Math.cos(f) * 8.45, f);
+      const h = new T.Mesh(new T.PlaneGeometry(16, 16), wHalo); h.rotation.x = -Math.PI / 2; h.position.set(lx + Math.sin(f) * 11, SEA.water + 0.05, lz + Math.cos(f) * 11); scene.add(h);
+    }
+    const nameTex = (() => {
+      const c = document.createElement('canvas'); c.width = 2048; c.height = 360; const g = c.getContext('2d');
+      g.fillStyle = '#EEF1F3'; g.fillRect(0, 0, 2048, 360); g.fillStyle = '#FECC00'; g.fillRect(0, 336, 2048, 24);
+      const im = CFT.LOGO_IMG && CFT.LOGO_IMG.mark, mh = 230, mw = im ? mh * im.naturalWidth / im.naturalHeight : 0;
+      g.font = '600 200px "Helvetica Neue", Helvetica, Arial, sans-serif'; const tw = g.measureText('CFT KINETIC').width, x0 = (2048 - mw - 60 - tw) / 2;
+      if (im) g.drawImage(im, x0, 55, mw, mh);
+      g.fillStyle = '#1B1F24'; g.textBaseline = 'middle'; g.fillText('CFT KINETIC', x0 + mw + 60, 178);
+      const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; t.anisotropy = 8; return t;
+    })();
+    const nameSign = new T.Mesh(new T.PlaneGeometry(26, 4.6), new T.MeshBasicMaterial({ map: nameTex }));
+    nameSign.position.set(cx, -5.4, cz + (R - 2) * Math.cos(Math.PI / 8) + 0.6); nameSign.rotation.x = -0.05; scene.add(nameSign);
     for (let k = 0; k < 8; k++) {
       const [x0, z0] = oct(k), [x1, z1] = oct(k + 1), L = Math.hypot(x1 - x0, z1 - z0), ry = Math.atan2(-(z1 - z0), x1 - x0);
       const nx = (x0 + x1) / 2 - cx, nz = (z0 + z1) / 2 - cz, nl = Math.hypot(nx, nz), ix = -nx / nl * 0.6, iz = -nz / nl * 0.6;
@@ -3713,12 +3742,11 @@ CFT.loadModels = onProgress => {
       A.box(M.glass, L - 1, 1.1, 0.04, mx + ix, 0.6, mz + iz, ry);
       A.box(M.white, L - 1, 0.07, 0.1, mx + ix, 1.18, mz + iz, ry);
       A.box(M.glowGold, L, 0.05, 0.05, mx, -0.05, mz, ry);
-      A.box(M.glowGold, L + 10, 0.05, 0.05, (x0 + x1) / 2 * (R + 6.5) / R - cx * 6.5 / R, SEA.water + 0.92, (z0 + z1) / 2 * (R + 6.5) / R - cz * 6.5 / R, ry);
       for (let t = 0.1; t < 1; t += 0.2) A.box(M.white, 0.08, 1.1, 0.08, x0 + (x1 - x0) * t + ix, 0.6, z0 + (z1 - z0) * t + iz);
     }
     // Water: a huge plane with a scrolling normal map; it reflects the sky (world.setSky gives it the envMap).
-    TX.water.repeat.set(260, 260);
-    const waterM = new T.MeshStandardMaterial({ color: 0x1E3437, roughness: 0.12, metalness: 0.35, normalMap: TX.water, normalScale: new T.Vector2(0.5, 0.5), envMapIntensity: 0.55 });
+    TX.water.repeat.set(130, 130);
+    const waterM = new T.MeshStandardMaterial({ color: 0x05243A, roughness: 0.14, metalness: 0.5, normalMap: TX.water, normalScale: new T.Vector2(0.35, 0.35), envMapIntensity: 0.6 });
     const water = new T.Mesh(new T.PlaneGeometry(2600, 2600), waterM); water.rotation.x = -Math.PI / 2; water.position.set(cx, SEA.water, cz);
     scene.add(water); world.water = water;
     // Glowing buoys, each tethered to the nearest deck corner, bobbing on the swell.
@@ -3756,20 +3784,56 @@ CFT.loadModels = onProgress => {
       g.scale.setScalar(s); scene.add(g);
       drones.push({ g, red, grn, r: 70 + Geo.hash(i, 4, 83) * 110, h: 24 + Geo.hash(i, 5, 83) * 30, w: (0.03 + Geo.hash(i, 6, 83) * 0.05) * (i % 2 ? 1 : -1), a: i * 0.7 });
     }
-    // Distant stations: octagonal decks on legs with tiered octagonal blocks, softened by the haze.
-    const farM = new T.MeshStandardMaterial({ color: 0xC9CFD2, roughness: 0.6, metalness: 0.2 });
+    // Satellite stations: octagonal decks on legs with a white dome over a lit glass drum, pontoons and
+    // thrusters. Four are joined to the museum by bridges (two off each side, as on the user's top-down plan);
+    // more stand further out to sea.
+    const deckM = new T.MeshStandardMaterial({ color: 0xDADFE3, roughness: 0.5, metalness: 0.2 });
+    const domeM = new T.MeshStandardMaterial({ color: 0xF2F4F6, roughness: 0.2, metalness: 0.3 });
     const far = new Geo.Batch();
-    [[-160, -260, 22], [210, -330, 18], [-330, 120, 26], [300, 160, 16], [40, -520, 30]].forEach(([x, z, r], i) => {
-      far.add(new T.CylinderGeometry(r, r, 3, 8), farM, x, SEA.water + 7, z, Math.PI / 8);
-      far.add(new T.CylinderGeometry(r * 0.62, r * 0.7, 4, 8), farM, x, SEA.water + 10.5, z, Math.PI / 8);
-      far.add(new T.CylinderGeometry(r * 0.32, r * 0.4, 3, 8), farM, x, SEA.water + 14, z, Math.PI / 8 + i);
-      for (let k = 0; k < 4; k++) { const b = k * Math.PI / 2 + Math.PI / 4; far.add(new T.CylinderGeometry(0.8, 0.8, 7, 8), farM, x + Math.sin(b) * r * 0.7, SEA.water + 3, z + Math.cos(b) * r * 0.7); }
-    });
+    const station = (x, z, r, y0) => {
+      far.add(new T.CylinderGeometry(r, r, 1.6, 8), deckM, x, y0 - 0.8, z, Math.PI / 8);
+      far.add(new T.CylinderGeometry(r - 0.6, r * 0.7, 3.2, 8), hullM, x, y0 - 3.2, z, Math.PI / 8);
+      far.add(new T.CylinderGeometry(r - 0.9, r - 1.0, 0.6, 8, 1, true), bandM, x, y0 - 2.3, z, Math.PI / 8);
+      far.add(new T.CylinderGeometry(r * 0.5, r * 0.52, 2.4, 8, 1, true), bandM, x, y0 + 1.2, z, Math.PI / 8);
+      far.add(new T.SphereGeometry(r * 0.5, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), domeM, x, y0 + 2.4, z);
+      far.add(new T.CylinderGeometry(0.12, 0.12, r * 0.5, 6), hullM, x, y0 + 2.4 + r * 0.75, z);
+      for (let k = 0; k < 4; k++) {
+        const b = k * Math.PI / 2 + Math.PI / 4, lx = x + Math.sin(b) * r * 0.62, lz = z + Math.cos(b) * r * 0.62, top = y0 - 4.8;
+        far.add(new T.BoxGeometry(3, top - SEA.water, 3), hullM, lx, (top + SEA.water) / 2, lz, b);
+        far.add(Geo.roundedBox(4.6, 2, 4.6, 0.4), hullM, lx, SEA.water + 0.4, lz, b);
+        far.add(new T.CircleGeometry(0.7, 16), thrM, lx + Math.sin(b) * 2.35, SEA.water + 0.5, lz + Math.cos(b) * 2.35, b);
+        const h = new T.Mesh(new T.PlaneGeometry(8, 8), wHalo); h.rotation.x = -Math.PI / 2; h.position.set(lx + Math.sin(b) * 4, SEA.water + 0.05, lz + Math.cos(b) * 4); scene.add(h);
+      }
+    };
+    const apo = SEA.apo, SR = 16, SX = apo + 58 + SR;
+    [-1, 1].forEach(side => [-22, 22].forEach(dz => {
+      const z = cz + dz, x0 = cx + side * (apo - 0.5), x1 = cx + side * (SX - SR + 0.8), L = Math.abs(x1 - x0), mx = (x0 + x1) / 2;
+      station(cx + side * SX, z, SR, 0);
+      // Bridge: deck, glass side rails with a white top rail, cyan edge lights and piers down to the sea.
+      far.add(new T.BoxGeometry(L, 0.6, 5), deckM, mx, -0.3, z);
+      [-2.4, 2.4].forEach(o => {
+        far.add(new T.BoxGeometry(L, 1.1, 0.05), M.glass, mx, 0.55, z + o);
+        far.add(new T.BoxGeometry(L, 0.07, 0.1), M.white, mx, 1.12, z + o);
+        far.add(new T.BoxGeometry(L, 0.06, 0.06), M.glowGold, mx, -0.62, z + o * 1.02);
+      });
+      for (let t = 0.2; t < 0.9; t += 0.3) far.add(new T.CylinderGeometry(0.7, 0.9, -0.6 - SEA.water, 10), hullM, x0 + (x1 - x0) * t, (SEA.water - 0.6) / 2, z);
+    }));
+    [[-210, -270, 22], [240, -310, 18], [-370, 170, 24], [340, 240, 20], [40, -470, 26], [-80, 400, 18], [440, -60, 22], [-460, -40, 20]].forEach(([x, z, r]) => station(x, z, r, SEA.water + 11));
     far.build(scene);
+    // A fast boat circling the station, trailing a white wake.
+    const boat = new T.Group();
+    const bodyM = new T.MeshStandardMaterial({ color: 0xF4F6F8, roughness: 0.3 });
+    const hullB = new T.Mesh(Geo.roundedBox(2.4, 1.1, 7, 0.4), bodyM); hullB.position.y = 0.4; boat.add(hullB);
+    const cabin = new T.Mesh(Geo.roundedBox(1.9, 0.9, 2.4, 0.3), new T.MeshStandardMaterial({ color: 0x1D2A36, roughness: 0.15, metalness: 0.5 })); cabin.position.set(0, 1.25, 0.4); boat.add(cabin);
+    const wake = new T.Mesh(new T.PlaneGeometry(5, 40), new T.MeshBasicMaterial({ map: TX.beam, color: 0xE8F6FF, transparent: true, opacity: 0.7, blending: T.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    wake.rotation.x = -Math.PI / 2; wake.position.set(0, -0.3, -23); boat.add(wake);
+    scene.add(boat);
     let t = 0;
     world.animated.push({ update(dt) {
       t += dt;
       TX.water.offset.set(t * 0.004, t * 0.0025);
+      const ba = t * 0.075;
+      boat.position.set(cx + Math.sin(ba) * 190, SEA.water, cz + Math.cos(ba) * 190); boat.rotation.y = ba + Math.PI / 2;
       buoys.forEach(b => { b.g.position.y = SEA.water + Math.sin(t * 1.1 + b.ph) * 0.12; b.g.rotation.z = Math.sin(t * 0.9 + b.ph) * 0.06; });
       const blink = (t % 1.2) < 0.15;
       drones.forEach(d => {
