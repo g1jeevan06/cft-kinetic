@@ -5050,9 +5050,34 @@ CFT.loadModels = onProgress => {
       for (let i = 0; i < 60; i++) { x.strokeStyle = `rgba(200,200,200,${0.2 + Math.random() * 0.3})`; x.lineWidth = 0.6; x.beginPath(); const a = Math.random() * 256, b = Math.random() * 256; x.moveTo(a, b); x.lineTo(a + (Math.random() - 0.5) * 40, b + (Math.random() - 0.5) * 12); x.stroke(); }
       const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t;
     })();
+    // A normal map from a canvas height field (lighter = higher).
+    const normalFrom = (size, heights, k) => {
+      const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d'), img = x.createImageData(size, size);
+      const h = (i, j) => heights[((j + size) % size) * size + (i + size) % size];
+      for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
+        const dx = (h(i + 1, j) - h(i - 1, j)) * k, dy = (h(i, j + 1) - h(i, j - 1)) * k, l = Math.hypot(dx, dy, 1), o = (j * size + i) * 4;
+        img.data[o] = (-dx / l * 0.5 + 0.5) * 255; img.data[o + 1] = (dy / l * 0.5 + 0.5) * 255; img.data[o + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[o + 3] = 255;
+      }
+      x.putImageData(img, 0, 0); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t;
+    };
+    const peel = (() => {
+      const S = 256, a = new Float32Array(S * S);
+      for (let n = 0; n < 900; n++) { const cx = Math.random() * S, cy = Math.random() * S, r = 2 + Math.random() * 5, v = (Math.random() - 0.5) * 0.6;
+        for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const d = Math.hypot(i, j) / r; if (d < 1) a[((cy + j + S) % S | 0) * S + ((cx + i + S) % S | 0)] += v * (1 - d * d); } }
+      for (let n = 0; n < 40; n++) { let x0 = Math.random() * S, y0 = Math.random() * S; const ang = Math.random() * Math.PI, L = 10 + Math.random() * 40;
+        for (let k = 0; k < L; k++) a[((y0 + Math.sin(ang) * k + S) % S | 0) * S + ((x0 + Math.cos(ang) * k + S) % S | 0)] -= 0.8; }
+      const t = normalFrom(S, a, 1.2); t.repeat.set(3, 3); return t;
+    })();
+    const brushed = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+      x.fillStyle = '#6a6a6a'; x.fillRect(0, 0, 256, 256);
+      for (let i = 0; i < 700; i++) { const v = 70 + Math.random() * 90 | 0; x.fillStyle = `rgba(${v},${v},${v},0.5)`; x.fillRect(0, Math.random() * 256, 256, 0.6 + Math.random()); }
+      const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(2, 2); return t;
+    })();
     const M = {
-      paint: new T.MeshPhysicalMaterial({ color: paint.paint, roughness: paint.rough, roughnessMap: wear, metalness: paint.metal, clearcoat: 0.6, clearcoatRoughness: 0.25 }),
-      trim: new T.MeshStandardMaterial({ color: paint.trim, roughness: 0.3, metalness: 0.85 }),
+      paint: new T.MeshPhysicalMaterial({ color: paint.paint, roughness: paint.rough, roughnessMap: wear, normalMap: peel, normalScale: new T.Vector2(0.25, 0.25), metalness: paint.metal, clearcoat: 0.6, clearcoatRoughness: 0.25 }),
+      trim: new T.MeshStandardMaterial({ color: paint.trim, roughness: 0.32, roughnessMap: brushed, metalness: 0.85 }),
+      seam: new T.MeshStandardMaterial({ color: 0x0B0C0D, roughness: 0.9, metalness: 0.2 }),
       black: new T.MeshStandardMaterial({ color: 0x17191C, roughness: 0.45, metalness: 0.5 }),
       rubber: new T.MeshStandardMaterial({ color: 0x0E0F10, roughness: 0.85, metalness: 0 }),
       chrome: new T.MeshStandardMaterial({ color: 0xEDEFF1, roughness: 0.1, metalness: 1 }),
@@ -5060,7 +5085,7 @@ CFT.loadModels = onProgress => {
       glow: new T.MeshBasicMaterial({ color: paint.eye, toneMapped: false }),
       led: new T.MeshBasicMaterial({ color: paint.led, toneMapped: false })
     };
-    const SHELL = [M.paint, M.trim, M.black, M.rubber, M.chrome];
+    const SHELL = [M.paint, M.trim, M.black, M.rubber, M.chrome, M.seam];
     const root = new T.Group(), bones = {};
     const bone = (name, parent, x, y, z) => { const b = new T.Bone(); b.name = 'cg_' + name; b.position.set(x, y, z); (parent ? bones[parent] : root).add(b); bones[name] = b; return b; };
     bone('root', null, 0, 0, 0);
@@ -5103,6 +5128,9 @@ CFT.loadModels = onProgress => {
       mesh(cylX(0.11, 0.075, 32), M.rubber, 0, 0, 0, wh);
       [-1, 1].forEach(k => mesh(cylX(0.075, 0.08, 24), M.trim, k * 0.002, 0, 0, wh));
       for (let i = 0; i < 6; i++) { const b = mesh(new T.BoxGeometry(0.082, 0.02, 0.05), M.black, 0, 0, 0, wh); b.rotation.x = i * Math.PI / 3; b.translateY(0.045); }
+      // Tread blocks round the tyre, and five hub bolts each side.
+      for (let i = 0; i < 26; i++) { const b = mesh(new T.BoxGeometry(0.07, 0.008, 0.016), M.rubber, 0, 0, 0, wh); b.rotation.x = i / 26 * Math.PI * 2; b.translateY(0.112); b.castShadow = false; }
+      [-1, 1].forEach(k => { for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; const bo = mesh(cylX(0.008, 0.008, 8), M.chrome, k * 0.043, Math.sin(a) * 0.05, Math.cos(a) * 0.05, wh); bo.castShadow = false; } });
     });
     // Hips and body shell with trim bands, the CFT KINETIC mark on the chest and a vent panel on the back.
     mesh(rb(0.38, 0.07, 0.25, 0.03), M.trim, 0, 0.02, 0, 'hips');
@@ -5125,8 +5153,21 @@ CFT.loadModels = onProgress => {
     });
     mesh(new T.PlaneGeometry(0.22, 0.2), back, 0, 0.19, -0.1262, 'spine').rotation.y = Math.PI;
     for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) mesh(new T.SphereGeometry(0.008, 8, 6), M.trim, sx * 0.14, 0.18 + sy * 0.13, 0.126, 'spine');
+    // Panel seams on the body shell: a band round the waist, a vertical seam down each side, and screws on the sides.
+    const seam = (w, h, d, x, y, z, parent, ry) => { const o = mesh(new T.BoxGeometry(w, h, d), M.seam, x, y, z, parent); o.castShadow = false; if (ry) o.rotation.y = ry; return o; };
+    seam(0.334, 0.005, 0.252, 0, 0.1, 0, 'spine');
+    [-1, 1].forEach(sx => { seam(0.004, 0.26, 0.004, sx * 0.1665, 0.2, 0.05, 'spine'); seam(0.004, 0.26, 0.004, sx * 0.1665, 0.2, -0.05, 'spine');
+      for (const [y, z] of [[0.08, 0.1], [0.3, 0.1], [0.08, -0.1], [0.3, -0.1]]) mesh(new T.SphereGeometry(0.007, 8, 6), M.trim, sx * 0.167, y, z, 'spine'); });
+    // Three small status lights above the chest mark.
+    const statusM = [0x3BFF7A, 0xFFB020, 0x3FB2FF].map(c => new T.MeshBasicMaterial({ color: c, toneMapped: false }));
+    const status = statusM.map((m, i) => mesh(new T.SphereGeometry(0.008, 10, 8), m, 0.07 + i * 0.022, 0.31, 0.127, 'spine'));
+    // Cables from the back of the body into each shoulder.
+    [-1, 1].forEach(sx => [[-0.07, 0.0085], [-0.045, 0.006]].forEach(([z, r]) => {
+      const pts = [V(sx * 0.13, 0.27, z - 0.06), V(sx * 0.2, 0.36, z - 0.03), V(sx * 0.215, 0.315, z * 0.3)];
+      mesh(new T.TubeGeometry(new T.CatmullRomCurve3(pts), 16, r, 6), M.rubber, 0, 0, 0, 'spine');
+    }));
     mesh(new T.CylinderGeometry(0.07, 0.08, 0.09, 24), M.black, 0, 0.035, 0, 'neck');
-    for (let i = 0; i < 3; i++) mesh(new T.TorusGeometry(0.075, 0.006, 6, 24), M.trim, 0, 0.01 + i * 0.025, 0, 'neck').rotation.x = Math.PI / 2;
+    for (let i = 0; i < 5; i++) mesh(new T.TorusGeometry(0.076, 0.006, 6, 24), M.trim, 0, 0.0 + i * 0.018, 0, 'neck').rotation.x = Math.PI / 2;
     // Head: flared base ring, face drum, band, flattened dome and a ring of screws.
     const HR = 0.35;
     mesh(new T.CylinderGeometry(HR + 0.02, HR - 0.02, 0.05, 56), M.trim, 0, 0.02, 0, 'head');
@@ -5134,6 +5175,12 @@ CFT.loadModels = onProgress => {
     mesh(new T.CylinderGeometry(HR + 0.008, HR + 0.008, 0.04, 56), M.trim, 0, 0.235, 0, 'head');
     mesh(new T.SphereGeometry(HR, 56, 20, 0, Math.PI * 2, 0, Math.PI / 2), M.paint, 0, 0.255, 0, 'head').scale.y = 0.48;
     for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; mesh(new T.SphereGeometry(0.007, 8, 6), M.black, Math.sin(a) * (HR + 0.01), 0.235, Math.cos(a) * (HR + 0.01), 'head'); }
+    // Vertical seams round the face drum (clear of the eyes), and a speaker grille each side.
+    [Math.PI / 2, -Math.PI / 2, Math.PI, Math.PI * 0.75, -Math.PI * 0.75].forEach(a => seam(0.004, 0.17, 0.006, Math.sin(a) * (HR + 0.001), 0.13, Math.cos(a) * (HR + 0.001), 'head', a));
+    [-1, 1].forEach(sx => {
+      const g = mesh(new T.CircleGeometry(0.055, 28), M.black, sx * (HR + 0.002), 0.13, -0.02, 'head'); g.rotation.y = sx * Math.PI / 2;
+      for (let i = -2; i <= 2; i++) { const sl = mesh(new T.BoxGeometry(0.004, 0.006, 0.07 - Math.abs(i) * 0.012), M.trim, sx * (HR + 0.004), 0.13 + i * 0.018, -0.02, 'head'); sl.castShadow = false; }
+    });
     // Eyes: deep black housing, thin bezel, and a round screen that draws the expression, under a glass cover.
     const ec = document.createElement('canvas'); ec.width = ec.height = 256; const eg = ec.getContext('2d');
     const eyeTex = new T.CanvasTexture(ec); eyeTex.encoding = T.sRGBEncoding;
@@ -5161,10 +5208,22 @@ CFT.loadModels = onProgress => {
       mesh(rb(0.142, 0.045, 0.152, 0.014), M.trim, 0, -0.075, 0.005, el);
       mesh(rb(0.142, 0.05, 0.152, 0.014), M.trim, 0, -0.33, 0.005, el);
       mesh(new T.BoxGeometry(0.02, 0.16, 0.02), M.black, s * 0.066, -0.19, 0.06, el);
+      seam(0.004, 0.2, 0.004, s * 0.0655, -0.19, -0.035, el);
+      for (const y of [-0.12, -0.26]) mesh(new T.SphereGeometry(0.007, 8, 6), M.trim, 0, y, 0.076, el);
       mesh(new T.CylinderGeometry(0.012, 0.012, 0.16, 8), M.chrome, s * 0.066, -0.19, 0.035, el);
       mesh(rb(0.095, 0.07, 0.1, 0.018), M.black, 0, -0.02, 0.005, wr);
       [1, 2].forEach(k => mesh(rb(0.05, 0.085, 0.024, 0.008), M.black, 0, -0.04, 0, 'finger' + n + k));
     });
+
+    // Soft contact shadow on the floor under the robot (the real shadow map is off on Low quality).
+    const blob = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 4, 64, 64, 62);
+      gr.addColorStop(0, 'rgba(0,0,0,0.75)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+      return new T.CanvasTexture(c);
+    })();
+    const shadow = new T.Mesh(new T.PlaneGeometry(0.8, 0.6), new T.MeshBasicMaterial({ map: blob, transparent: true, depthWrite: false, toneMapped: false }));
+    shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.004; shadow.renderOrder = 1; root.add(shadow);
+    [-1, 1].forEach(sx => { const w = new T.Mesh(new T.PlaneGeometry(0.2, 0.26), shadow.material); w.rotation.x = -Math.PI / 2; w.position.set(sx * 0.15, 0.005, 0); w.renderOrder = 1; root.add(w); });
 
     // Joint markers for the rig view (hidden unless the rig is shown).
     const jointM = new T.MeshBasicMaterial({ color: 0x19E6FF, depthTest: false, toneMapped: false }), joints = [];
@@ -5265,7 +5324,14 @@ CFT.loadModels = onProgress => {
       else if (expr === 'heart') { g.beginPath(); g.moveTo(128, 200); g.bezierCurveTo(34, 140, 50, 56, 128, 94); g.bezierCurveTo(206, 56, 222, 140, 128, 200); g.fill(); }
       else if (expr === 'wide') { ring(90, 8); ring(46, 7); g.beginPath(); g.arc(cx, cy, 14, 0, Math.PI * 2); g.fill(); }
       else {
-        ring(74, 11); ring(32, 6);
+        // A camera lens: bright outer ring, fainter inner rings, six iris blades round a dark pupil.
+        ring(74, 11);
+        g.shadowBlur = 8; g.globalAlpha = 0.45; ring(60, 2); ring(50, 1.5); g.globalAlpha = 1; g.shadowBlur = 22;
+        g.lineWidth = 3; g.beginPath();
+        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + 0.3, b = a + Math.PI / 3; g.moveTo(cx + Math.cos(a) * 34, cy + Math.sin(a) * 34); g.lineTo(cx + Math.cos(b) * 34, cy + Math.sin(b) * 34); g.moveTo(cx + Math.cos(a) * 34, cy + Math.sin(a) * 34); g.lineTo(cx + Math.cos(a + 0.9) * 18, cy + Math.sin(a + 0.9) * 18); }
+        g.stroke();
+        const pg = g.createRadialGradient(cx, cy, 2, cx, cy, 20); pg.addColorStop(0, '#000'); pg.addColorStop(1, 'rgba(0,0,0,0)'); g.shadowBlur = 0; g.fillStyle = pg; g.beginPath(); g.arc(cx, cy, 20, 0, Math.PI * 2); g.fill();
+        g.shadowBlur = 22; g.fillStyle = c;
         if (expr === 'focus') { g.shadowBlur = 0; g.fillStyle = '#030405'; g.fillRect(0, 0, 256, 96); g.shadowBlur = 22; g.lineWidth = 8; g.beginPath(); g.moveTo(54, 96); g.lineTo(202, 96); g.stroke(); }
       }
       g.shadowBlur = 0;
@@ -5274,6 +5340,11 @@ CFT.loadModels = onProgress => {
     }
 
     let t = 0, cur = null, fading = false, rollW = 0, blinkT = 0, nextBlink = 3, forced = null, forcedT = 0;
+    // Springs on top of the clips: the body pitches back as it speeds up and forward as it brakes, leans into turns,
+    // and settles with a small wobble; the head leads each turn.
+    const spring = () => ({ x: 0, v: 0, step(target, dt, k, c) { this.v += (-(this.x - target) * k - this.v * c) * dt; this.x += this.v * dt; return this.x; } });
+    const pitch = spring(), roll = spring(), lead = spring();
+    let lastSpeed = 0, accel = 0;
     const api = {
       root, skeleton, bones, clips: CLIPS,
       gesture(name) {
@@ -5294,8 +5365,9 @@ CFT.loadModels = onProgress => {
         joints.forEach(j => { j.visible = on; });
         SHELL.forEach(m => { m.transparent = on; m.opacity = on ? 0.35 : 1; m.depthWrite = !on; m.needsUpdate = true; });
       },
-      update(dt, speed) {
+      update(dt, speed, turnRate) {
         t += dt;
+        dt = Math.min(dt, 0.05);
         rollW += (Math.min(1, speed / 1.2) - rollW) * Math.min(1, dt * 6);
         let gw = 0;
         if (cur) {
@@ -5308,6 +5380,16 @@ CFT.loadModels = onProgress => {
         acts.Roll.timeScale = 0.6 + Math.min(1.6, speed / 2.5);
         mixer.update(dt);
         bones.wheelL.rotation.x += speed * dt / 0.11; bones.wheelR.rotation.x += speed * dt / 0.11;
+        accel += ((speed - lastSpeed) / Math.max(dt, 1e-3) - accel) * Math.min(1, dt * 10); lastSpeed = speed;
+        const tr = Math.max(-3, Math.min(3, turnRate || 0));
+        const p = pitch.step(Math.max(-0.14, Math.min(0.14, -accel * 0.02)), dt, 90, 7);
+        const r = roll.step(Math.max(-0.12, Math.min(0.12, -tr * speed * 0.03)), dt, 70, 8);
+        const l = lead.step(Math.max(-0.45, Math.min(0.45, tr * 0.18)), dt, 60, 10);
+        bones.spine.rotateX(p); bones.spine.rotateZ(r);
+        bones.head.rotateX(-p * 0.6); bones.head.rotateZ(-r * 0.5); bones.head.rotateY(l);
+        // Tiny servo corrections in the neck, as a real head never holds perfectly still.
+        bones.head.rotateY(Math.sin(t * 7.3) * Math.sin(t * 2.1) * 0.004); bones.head.rotateX(Math.sin(t * 5.9) * 0.003);
+        status[0].visible = (t % 1.6) < 1.3; status[1].visible = (t % 0.9) < 0.12 || speed > 0.3; status[2].visible = Math.sin(t * 3) > -0.6;
         // Expression: focused while rolling, from the gesture while one plays, blinking now and then.
         let expr = rollW > 0.5 ? 'focus' : 'normal';
         if (cur && !fading) expr = EXPR[cur] || expr;
@@ -5404,8 +5486,24 @@ CFT.loadModels = onProgress => {
       const tag = new T.Sprite(new T.SpriteMaterial({ map: tagTex, depthWrite: false })); tag.scale.set(0.62, 0.155, 1); tag.position.y = 1.8; g.add(tag);
       guide = { g, bot, oneShot: 0, idle: 0, pos: V(0, FLOOR, 30), heading: Math.PI, speed: 0, stuck: 0, placed: false, route: null, refresh: 0, waved: '', stop: '' };
     }
+    // Motor hum: a soft low tone whose pitch and level follow the rolling speed, fading with distance.
+    let humNodes = null;
+    function hum(speed, dist, on) {
+      const A = CFT.Audio;
+      if (!A || !A.ctx) return;
+      if (!humNodes) {
+        const o = A.ctx.createOscillator(), o2 = A.ctx.createOscillator(), lp = A.ctx.createBiquadFilter(), g = A.ctx.createGain();
+        o.type = 'sawtooth'; o2.type = 'triangle'; lp.type = 'lowpass'; lp.frequency.value = 420; g.gain.value = 0;
+        o.connect(lp); o2.connect(lp); lp.connect(g); g.connect(A.master); o.start(); o2.start();
+        humNodes = { o, o2, lp, g };
+      }
+      const k = on ? Math.min(1, speed / 3) * Math.max(0, 1 - dist / 14) : 0, now = A.ctx.currentTime;
+      humNodes.g.gain.setTargetAtTime(k * 0.03, now, 0.08);
+      humNodes.o.frequency.setTargetAtTime(55 + speed * 22, now, 0.1); humNodes.o2.frequency.setTargetAtTime(110 + speed * 44, now, 0.1);
+    }
     function gesture(name) {
       if (!guide) return;
+      if (CFT.Audio && CFT.Audio.ctx && guide.g.visible) { CFT.Audio.tone(620, 0.18, 'triangle', 0.012); CFT.Audio.tone(820, 0.22, 'triangle', 0.01, 0.12); }   // servo chirp
       guide.oneShot = guide.bot.gesture(name);
     }
     // Where along the route, `dist` metres on from its start; returns the point and the walking direction there.
@@ -5431,7 +5529,7 @@ CFT.loadModels = onProgress => {
     function updateGuide(dt, ctx) {
       const gd = guide;
       gd.g.visible = people.guideOn && ctx.show && ctx.phase !== 'title' && ctx.phase !== 'cinematic';
-      if (!gd.g.visible) { gd.placed = false; return; }
+      if (!gd.g.visible) { gd.placed = false; hum(0, 99, false); return; }
       const p = ctx.player;
       if (!gd.placed) { placeNear(ctx); gd.placed = true; gd.heading = Math.atan2(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z); }
       let moving = 0;
@@ -5473,7 +5571,10 @@ CFT.loadModels = onProgress => {
       // Standing about for a while: it looks round the hall.
       gd.idle = moving > 0.25 || gd.oneShot > 0 ? 0 : gd.idle + dt;
       if (gd.idle > 8) { gd.idle = 0; gesture('LookAround'); }
-      gd.bot.update(dt, moving);
+      const turnRate = (() => { let d = gd.heading - (gd.lastHeading === undefined ? gd.heading : gd.lastHeading); while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d / Math.max(dt, 1e-3); })();
+      gd.lastHeading = gd.heading;
+      gd.bot.update(dt, moving, turnRate);
+      hum(moving, Math.hypot(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z), gd.g.visible && ctx.live);
       if (rigHelper) rigHelper.visible = gd.g.visible;
       gd.g.position.copy(gd.pos); gd.g.rotation.y = gd.heading;
     }
