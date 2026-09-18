@@ -632,6 +632,9 @@
         <label class="setting"><span>Invert mouse Y</span><input type="checkbox" id="set-invert"></label>
         <label class="setting"><span>Graphics quality</span><select id="set-quality"><option value="high">High · reflections + glow</option><option value="medium">Medium · glow</option><option value="low">Low · fastest</option></select></label>
         <label class="setting"><span>Sky</span><select id="set-sky"></select></label>
+        <label class="setting"><span>Third-person view · C</span><input type="checkbox" id="set-view"></label>
+        <label class="setting"><span>Tour guide robot</span><input type="checkbox" id="set-guide"></label>
+        <label class="setting"><span>Other visitors</span><input type="checkbox" id="set-crowd"></label>
       </div>
       <h3 class="section-label">Controls</h3>
       <div id="controls-pause"></div>
@@ -4653,6 +4656,7 @@ CFT.loadModels = onProgress => {
     const S = G().state.settings;
     $('set-sens').value = S.sensitivity; $('set-vol').value = S.volume;
     $('set-voice').checked = S.voice; $('set-invert').checked = S.invertY;
+    $('set-view').checked = S.view === 'third'; $('set-guide').checked = S.guide !== false; $('set-crowd').checked = S.crowd !== false;
     $('set-quality').value = S.quality;
     const g = G();
     $('set-sky').innerHTML = g.world.skies.map(id => `<option value="${id}">${CFT.SKY_NAMES[id] || id}</option>`).join('');
@@ -4676,6 +4680,9 @@ CFT.loadModels = onProgress => {
     $('set-vol').oninput = e => { S().volume = +e.target.value; Audio.setVolume(S().volume); G().save(); };
     $('set-voice').onchange = e => { S().voice = e.target.checked; if (!S().voice && window.speechSynthesis) speechSynthesis.cancel(); G().save(); };
     $('set-invert').onchange = e => { S().invertY = e.target.checked; G().save(); };
+    $('set-view').onchange = e => G().setView(e.target.checked ? 'third' : 'first');
+    $('set-guide').onchange = e => { S().guide = e.target.checked; G().applyPeople(); G().save(); };
+    $('set-crowd').onchange = e => { S().crowd = e.target.checked; G().applyPeople(); G().save(); };
     $('set-quality').onchange = e => G().setQuality(e.target.value, true);
     $('set-sky').onchange = e => { S().sky = e.target.value; G().world.setSky(S().sky); G().save(); };
   }
@@ -4738,7 +4745,7 @@ CFT.loadModels = onProgress => {
     open('company');
   }
   function controlsTable() {
-    const rows = [['W A S D', 'Move'], ['Mouse', 'Look around'], ['Shift', 'Walk faster'], ['Space', 'Jump'], ['E', 'Interact'], ['P', 'Screen pattern'], ['N', 'Animation speed'],['V', 'Product animation'], ['M', 'Map'], ['Tab', 'Journal'], ['Esc', 'Pause menu']];
+    const rows = [['W A S D', 'Move'], ['Mouse', 'Look around'], ['Shift', 'Walk faster'], ['Space', 'Jump'], ['E', 'Interact'], ['P', 'Screen pattern'], ['N', 'Animation speed'],['V', 'Product animation'], ['C', 'First / third person'], ['M', 'Map'], ['Tab', 'Journal'], ['Esc', 'Pause menu']];
     return `<table class="controls"><tbody>${rows.map(r => `<tr><td>${r[0].split(' ').map(k => `<kbd class="kbd">${k}</kbd>`).join(' ')}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table>`;
   }
 
@@ -4855,6 +4862,281 @@ CFT.loadModels = onProgress => {
 
 </script>
 <script>
+// CFT Kinetic — people: the tour guide robot, the visitor's own body (third-person view) and other visitors.
+// The guide is the CC0 RobotExpressive model (models/guide.js) with its own animations. Everyone else is a simple
+// figure built here and walked by a coded stride, in keeping with the museum's other procedural pieces.
+(function () {
+  const T = THREE, V = (x, y, z) => new T.Vector3(x, y, z);
+  const mats = {};
+  const mat = (c, rough) => mats[c + ':' + (rough || 0.6)] || (mats[c + ':' + (rough || 0.6)] = new T.MeshStandardMaterial({ color: c, roughness: rough || 0.6 }));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  // ------------------------------------------------ A person: hips, two-part legs and arms, torso, head and hair.
+  // Faces +z. update(dt, speed) swings the limbs for a walking stride (about 1.4 m per full cycle) or idles.
+  function makeHuman(o) {
+    const root = new T.Group(), body = new T.Group(); root.add(body); body.scale.setScalar((o.height || 1.75) / 1.75);
+    const skin = mat(o.skin), shirt = mat(o.shirt), pants = mat(o.pants), shoe = mat(0x1D2024, 0.5), hair = mat(o.hair, 0.9);
+    const limb = (len, r0, r1, m) => {
+      const g = new T.Group(), mesh = new T.Mesh(new T.CylinderGeometry(r0, r1, len, 10), m);
+      mesh.position.y = -len / 2; mesh.castShadow = true; g.add(mesh); return g;
+    };
+    const hips = new T.Group(); hips.position.y = 0.93; body.add(hips);
+    const pelvis = new T.Mesh(new T.CylinderGeometry(0.16, 0.15, 0.2, 12), pants); pelvis.scale.z = 0.75; hips.add(pelvis);
+    const legs = [-1, 1].map(side => {
+      const thigh = limb(0.46, 0.085, 0.068, pants); thigh.position.x = side * 0.09; hips.add(thigh);
+      const shin = limb(0.44, 0.064, 0.05, pants); shin.position.y = -0.46; thigh.add(shin);
+      const foot = new T.Mesh(new T.BoxGeometry(0.1, 0.07, 0.25), shoe); foot.position.set(0, -0.475, 0.05); shin.add(foot);
+      return { thigh, shin };
+    });
+    const torso = new T.Group(); torso.position.y = 0.08; hips.add(torso);
+    const chest = new T.Mesh(new T.CylinderGeometry(0.19, 0.155, 0.56, 14), shirt); chest.position.y = 0.28; chest.scale.z = 0.7; chest.castShadow = true; torso.add(chest);
+    const cap = new T.Mesh(new T.SphereGeometry(0.19, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), shirt); cap.position.y = 0.555; cap.scale.set(1.1, 0.42, 0.7); torso.add(cap);
+    const neck = new T.Mesh(new T.CylinderGeometry(0.05, 0.056, 0.12, 8), skin); neck.position.y = 0.66; torso.add(neck);
+    const head = new T.Group(); head.position.y = 0.8; torso.add(head);
+    const face = new T.Mesh(new T.SphereGeometry(0.115, 16, 12), skin); face.scale.set(0.9, 1.06, 1); face.castShadow = true; head.add(face);
+    const hairM = new T.Mesh(new T.SphereGeometry(0.123, 16, 10, 0, Math.PI * 2, 0, Math.PI * (o.longHair ? 0.66 : 0.5)), hair);
+    hairM.position.set(0, 0.018, -0.012); hairM.scale.set(0.93, 1.02, 1.02); head.add(hairM);
+    const arms = [-1, 1].map(side => {
+      const upper = limb(0.3, 0.056, 0.047, shirt); upper.position.set(side * 0.215, 0.52, 0); torso.add(upper);
+      const fore = limb(0.27, 0.045, 0.037, o.longSleeves ? shirt : skin); fore.position.y = -0.3; upper.add(fore);
+      const hand = new T.Mesh(new T.SphereGeometry(0.045, 8, 6), skin); hand.position.y = -0.29; fore.add(hand);
+      return { upper, fore, side };
+    });
+    let ph = Math.random() * 6, amp = 0, breathe = Math.random() * 6;
+    return {
+      root,
+      update(dt, speed) {
+        amp += (Math.min(1, speed / 1.2) - amp) * Math.min(1, dt * 6);
+        ph += dt * speed / 1.4 * Math.PI * 2; breathe += dt;
+        legs.forEach((l, i) => {
+          const s = Math.sin(ph + i * Math.PI);
+          l.thigh.rotation.x = -s * 0.5 * amp;
+          l.shin.rotation.x = (0.05 + 0.6 * Math.max(0, Math.sin(ph + i * Math.PI + 1.3))) * amp;
+        });
+        arms.forEach((a, i) => {
+          a.upper.rotation.x = Math.sin(ph + i * Math.PI) * 0.42 * amp;
+          a.upper.rotation.z = a.side * (0.07 + 0.02 * Math.sin(breathe * 1.3));
+          a.fore.rotation.x = -0.12 - 0.3 * amp;
+        });
+        hips.position.y = 0.93 - Math.abs(Math.cos(ph)) * 0.035 * amp;
+        torso.rotation.y = Math.sin(ph) * 0.08 * amp;
+        chest.scale.x = 1 + Math.sin(breathe * 1.6) * 0.012 * (1 - amp);
+      }
+    };
+  }
+  const SKIN = [0xF1C9A5, 0xE3B38F, 0xC98E66, 0xA8714F, 0x7A4E36, 0x5A3825];
+  const HAIR = [0x1B1512, 0x3B2A1E, 0x6B4A2E, 0xA07A4E, 0x2A2A2A, 0xC9C2B8];
+  const SHIRT = [0xFECC00, 0x2F6FDB, 0xE85D4A, 0x3FA37A, 0xF4F4F4, 0x2A2E35, 0x8A5CC7, 0xE17924, 0x5FB8D8, 0xD9486F];
+  const PANTS = [0x2A3342, 0x1F2226, 0x4A5566, 0x6B5A48, 0x303A2E, 0xC9C2B0];
+  const randomLook = () => ({ skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRT), pants: pick(PANTS), height: rand(1.58, 1.9), longHair: Math.random() < 0.45, longSleeves: Math.random() < 0.4 });
+
+  // Turn an angle smoothly toward a target (shortest way round).
+  const turn = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
+
+  CFT.People = function (scene, world) {
+    const people = { guideOn: true, crowdOn: true };
+    const FLOOR = world.FLOOR;
+
+    // ------------------------------------------------ The visitor's own body, seen in the third-person view
+    const me = makeHuman({ skin: 0xE3B38F, hair: 0x2B1D14, shirt: 0xFECC00, pants: 0x1F2226, height: 1.78, longSleeves: false });
+    me.root.visible = false; scene.add(me.root);
+    let meSpeed = 0; const meLast = V(0, 0, 0);
+
+    // ------------------------------------------------ Other visitors
+    const crowd = [];
+    function viewingSpot(ex) {
+      // To one side of the centre line, so nobody stands where the visitor lands when jumping to the installation.
+      const lat = V(ex.front.z, 0, -ex.front.x), d = Math.min(ex.radius + 1.4, 4.4) + rand(0, 1.4), o = (Math.random() < 0.5 ? -1 : 1) * rand(1.6, 2.8);
+      return { x: ex.pos.x + ex.front.x * d + lat.x * o, z: ex.pos.z + ex.front.z * d + lat.z * o };
+    }
+    function planTrip(v) {
+      const exs = world.exhibits;
+      if (!exs.length) return;
+      let ex = null;
+      if (Math.random() > 0.15) { do { ex = pick(exs); } while (exs.length > 1 && ex === v.ex); }
+      const pts = world.routeTo(v.pos, world.zoneAt(v.pos.x, v.pos.z), ex);
+      if (ex) pts[pts.length - 1] = viewingSpot(ex);
+      else { const a = rand(0, Math.PI * 2), r = rand(11.5, 12.3); pts[pts.length - 1] = { x: Math.sin(a) * r, z: Math.cos(a) * r }; }
+      v.ex = ex; v.path = pts.slice(1); v.i = 0;
+    }
+    function spawnCrowd(n) {
+      const exs = world.exhibits;
+      for (let k = 0; k < n; k++) {
+        const h = makeHuman(randomLook()), ex = exs[k % exs.length];
+        const s = k < exs.length ? viewingSpot(ex) : (() => { const a = rand(0, Math.PI * 2); return { x: Math.sin(a) * 11.8, z: Math.cos(a) * 11.8 }; })();
+        const v = { h, pos: V(s.x, FLOOR, s.z), heading: 0, speed: 0, walk: rand(1.05, 1.4), path: null, i: 0, ex: k < exs.length ? ex : null, wait: rand(2, 14), col: { x: s.x, z: s.z, r: 0.28 } };
+        v.heading = v.ex ? Math.atan2(v.ex.pos.x - s.x, v.ex.pos.z - s.z) : Math.atan2(-s.x, -s.z);
+        h.root.position.copy(v.pos); h.root.rotation.y = v.heading;
+        scene.add(h.root); world.colliders.push(v.col); crowd.push(v);
+      }
+    }
+    function updateCrowd(dt, ctx) {
+      const pl = ctx.player.pos;
+      crowd.forEach(v => {
+        v.h.root.visible = people.crowdOn && ctx.show;
+        if (!people.crowdOn) { v.col.x = v.col.z = 1e6; return; }   // switched off: park the collision spot far away
+        let moving = false;
+        if (ctx.live) {
+          if (v.wait > 0) {
+            v.wait -= dt;
+            // Someone standing right beside the visitor moves on to the next installation.
+            if (Math.hypot(pl.x - v.pos.x, pl.z - v.pos.z) < 1.2 && v.wait > 0.5) v.wait = 0.5;
+            if (v.wait <= 0) planTrip(v);
+          } else if (v.path && v.i < v.path.length) {
+            const t = v.path[v.i], dx = t.x - v.pos.x, dz = t.z - v.pos.z, d = Math.hypot(dx, dz);
+            const px = pl.x - v.pos.x, pz = pl.z - v.pos.z, pd = Math.hypot(px, pz);
+            const blocked = pd < 1.0 && (px * dx + pz * dz) / (pd * d || 1) > 0.3;   // wait for the visitor ahead to pass
+            if (d < 0.3) { v.i++; if (v.i >= v.path.length) v.wait = rand(6, 16); }
+            else if (!blocked) {
+              const step = Math.min(d, v.walk * dt);
+              v.pos.x += dx / d * step; v.pos.z += dz / d * step;
+              v.heading = turn(v.heading, Math.atan2(dx, dz), Math.min(1, dt * 6));
+              moving = true;
+            }
+          } else v.wait = rand(4, 10);
+          // Standing still: look at the installation (or the globe from the lobby).
+          if (!moving && v.wait > 0) {
+            const fx = v.ex ? v.ex.pos.x : 0, fz = v.ex ? v.ex.pos.z : 0;
+            v.heading = turn(v.heading, Math.atan2(fx - v.pos.x, fz - v.pos.z), Math.min(1, dt * 2));
+          }
+        }
+        v.speed += ((moving ? v.walk : 0) - v.speed) * Math.min(1, dt * 8);
+        v.col.x = v.pos.x; v.col.z = v.pos.z;
+        const near = ctx.camera.position.distanceToSquared(v.pos) < 70 * 70;
+        v.h.root.position.set(v.pos.x, FLOOR, v.pos.z); v.h.root.rotation.y = v.heading;
+        if (near) v.h.update(dt, v.speed);
+      });
+    }
+
+    // ------------------------------------------------ The tour guide robot
+    let guide = null;
+    const LEAD = 3.4;
+    function loadGuide() {
+      if (!T.GLTFLoader) return;
+      const src = CFT.GUIDE_GLB ? Promise.resolve() : loadScript('models/guide.js');
+      src.then(() => new T.GLTFLoader().parse(toBuffer(CFT.GUIDE_GLB), '', gltf => {
+        const model = gltf.scene, box = new T.Box3().setFromObject(model), k = 1.45 / (box.max.y - box.min.y);
+        model.scale.setScalar(k); model.position.y = -box.min.y * k;
+        model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+        const g = new T.Group(); g.add(model); g.visible = false; scene.add(g);
+        // Name tag over its head.
+        const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+        const x = c.getContext('2d');
+        x.fillStyle = 'rgba(8,10,12,0.8)'; x.fillRect(0, 0, 256, 64); x.fillStyle = '#FECC00'; x.fillRect(0, 60, 256, 4);
+        x.font = '600 30px "Helvetica Neue", Helvetica, Arial, sans-serif'; x.fillStyle = '#FFFFFF'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('CFT GUIDE', 128, 32);
+        const tagTex = new T.CanvasTexture(c); tagTex.encoding = T.sRGBEncoding;
+        const tag = new T.Sprite(new T.SpriteMaterial({ map: tagTex, depthWrite: false })); tag.scale.set(0.62, 0.155, 1); tag.position.y = 1.72; g.add(tag);
+        const mixer = new T.AnimationMixer(model), acts = {};
+        gltf.animations.forEach(clip => { acts[clip.name] = mixer.clipAction(clip); });
+        ['Wave', 'ThumbsUp', 'Yes'].forEach(n => { if (acts[n]) { acts[n].setLoop(T.LoopOnce, 1); acts[n].clampWhenFinished = true; } });
+        guide = { g, mixer, acts, cur: null, oneShot: 0, pos: V(0, FLOOR, 30), heading: Math.PI, speed: 0, stuck: 0, placed: false, route: null, refresh: 0, waved: '', stop: '' };
+        play('Idle');
+      }, err => console.warn('The guide robot could not be loaded.', err))).catch(err => console.warn('The guide robot could not be loaded.', err));
+    }
+    function play(name, fade) {
+      const a = guide.acts[name];
+      if (!a || guide.cur === a) return;
+      a.reset().setEffectiveWeight(1).fadeIn(fade || 0.25).play();
+      if (guide.cur) guide.cur.fadeOut(fade || 0.25);
+      guide.cur = a;
+    }
+    function gesture(name) {
+      if (!guide || !guide.acts[name]) return;
+      guide.cur = null; play(name, 0.2); guide.oneShot = guide.acts[name].getClip().duration;
+    }
+    // Where along the route, `dist` metres on from its start; returns the point and the walking direction there.
+    function along(pts, dist) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1], dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz);
+        if (L < 0.01) continue;
+        if (L >= dist) return { x: a.x + dx * dist / L, z: a.z + dz * dist / L, dx: dx / L, dz: dz / L, end: false };
+        dist -= L;
+      }
+      const b = pts[pts.length - 1], a = pts[pts.length - 2], L = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+      return { x: b.x, z: b.z, dx: (b.x - a.x) / L, dz: (b.z - a.z) / L, end: true };
+    }
+    function placeNear(ctx) {
+      const p = ctx.player, fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+      const tries = [[1.8, 2.6], [-1.8, 2.6], [1.6, 1.4], [-1.6, 1.4], [0, 2.8], [1.8, -0.6], [-1.8, -0.6], [0, -2]];
+      for (const [r, f] of tries) {
+        const x = p.pos.x + fz * -r + fx * f, z = p.pos.z + fx * r + fz * f;   // r: to the right, f: forward
+        if (world.floorAt(x, z) !== null) { guide.pos.set(x, world.floorAt(x, z), z); return; }
+      }
+      guide.pos.set(p.pos.x, p.pos.y, p.pos.z);
+    }
+    function updateGuide(dt, ctx) {
+      const gd = guide;
+      gd.g.visible = people.guideOn && ctx.show && ctx.phase !== 'title' && ctx.phase !== 'cinematic';
+      if (!gd.g.visible) { gd.placed = false; return; }
+      const p = ctx.player;
+      if (!gd.placed) { placeNear(ctx); gd.placed = true; gd.heading = Math.atan2(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z); }
+      let moving = 0;
+      if (ctx.live) {
+        gd.refresh -= dt;
+        if (gd.refresh <= 0) { gd.refresh = 0.4; gd.route = ctx.routePoints(); }
+        let tx, tz, atStop = false;
+        const r = gd.route;
+        if (r && r.length > 1) {
+          // Lead: walk a few metres ahead along the guide line, a step to its right so it is not in the way.
+          const s = along(r, LEAD);
+          tx = s.x - s.dz * 0.9; tz = s.z + s.dx * 0.9;
+          atStop = s.end;
+          const key = Math.round(r[r.length - 1].x) + ',' + Math.round(r[r.length - 1].z);
+          if (gd.stop && key !== gd.stop && Math.hypot(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z) < 8) gesture('ThumbsUp');   // on to the next stop
+          gd.stop = key;
+          if (atStop && gd.waved !== key && Math.hypot(tx - gd.pos.x, tz - gd.pos.z) < 1) { gd.waved = key; gesture('Wave'); }
+        } else {
+          // Free exploring: keep close, just ahead and to the right of the visitor.
+          const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+          tx = p.pos.x + fx * 2.2 - fz * 1.6; tz = p.pos.z + fz * 2.2 + fx * 1.6;
+        }
+        // Never closer than 2 m to the visitor, so it does not fill the first-person view.
+        const ox = tx - p.pos.x, oz = tz - p.pos.z, od = Math.hypot(ox, oz);
+        if (od < 2) { const k = 2 / (od || 1); tx = p.pos.x + (od ? ox * k : 2); tz = p.pos.z + (od ? oz * k : 0); }
+        const dx = tx - gd.pos.x, dz = tz - gd.pos.z, d = Math.hypot(dx, dz);
+        const want = d < 0.35 ? 0 : Math.min(6.2, 0.6 + d * 1.6);
+        gd.speed += (want - gd.speed) * Math.min(1, dt * 5);
+        if (gd.speed > 0.05 && d > 0.05) {
+          const step = Math.min(d, gd.speed * dt), nx = gd.pos.x + dx / d * step, nz = gd.pos.z + dz / d * step, fy = world.floorAt(nx, nz);
+          if (fy !== null) { gd.pos.set(nx, fy, nz); gd.stuck = 0; moving = gd.speed; gd.heading = turn(gd.heading, Math.atan2(dx, dz), Math.min(1, dt * 8)); }
+          else gd.stuck += dt;
+        }
+        // Too far behind, or stuck on a wall: catch up beside the visitor.
+        if (gd.stuck > 1.2 || Math.hypot(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z) > 16) { placeNear(ctx); gd.stuck = 0; gd.speed = 0; }
+        if (!moving) gd.heading = turn(gd.heading, Math.atan2(p.pos.x - gd.pos.x, p.pos.z - gd.pos.z), Math.min(1, dt * 3));
+      }
+      if (gd.oneShot > 0) gd.oneShot -= dt;
+      else play(moving > 3.6 ? 'Running' : moving > 0.25 ? 'Walking' : 'Idle');
+      if (gd.acts.Walking) gd.acts.Walking.timeScale = Math.max(0.6, Math.min(1.8, moving / 1.9));
+      gd.mixer.update(dt);
+      gd.g.position.copy(gd.pos); gd.g.rotation.y = gd.heading;
+    }
+
+    // ------------------------------------------------ Per frame
+    // ctx: { phase, player, camera, thirdPerson, routePoints() }
+    people.update = function (dt, ctx) {
+      ctx.live = ctx.phase === 'play';
+      ctx.show = ctx.phase !== 'showcase' && ctx.phase !== 'loading';
+      if (!crowd.length && world.exhibits.length) spawnCrowd(14);
+      updateCrowd(dt, ctx);
+      if (guide) updateGuide(dt, ctx);
+      const p = ctx.player;
+      me.root.visible = !!ctx.thirdPerson && ctx.show && ctx.phase !== 'title' && ctx.phase !== 'cinematic';
+      if (me.root.visible) {
+        meSpeed += (Math.hypot(p.pos.x - meLast.x, p.pos.z - meLast.z) / Math.max(dt, 1e-3) - meSpeed) * Math.min(1, dt * 8);
+        me.root.position.copy(p.pos); me.root.rotation.y = p.yaw + Math.PI;
+        me.update(dt, p.onGround ? meSpeed : 0);
+      }
+      meLast.copy(p.pos);
+    };
+    people.wave = () => gesture('Wave');
+    loadGuide();
+    return people;
+  };
+})();
+</script>
+<script>
 // CFT Kinetic — boot, player controller, cinematic, rendering, progress and offscreen renders.
 (function () {
   const $ = id => document.getElementById(id);
@@ -4895,7 +5177,7 @@ CFT.loadModels = onProgress => {
   const G = CFT.G = {
     state: {
       progress: freshProgress(),
-      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sea', seaSky: true }, saved && saved.settings, saved && saved.settings && !saved.settings.seaSky ? { sky: 'sea', seaSky: true } : null)
+      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sea', seaSky: true, view: 'first', guide: true, crowd: true }, saved && saved.settings, saved && saved.settings && !saved.settings.seaSky ? { sky: 'sea', seaSky: true } : null)
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     player: { pos: new T.Vector3(0, 0, 54), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
@@ -5257,12 +5539,13 @@ CFT.loadModels = onProgress => {
     if (UI().anyOpen()) { if (UI().onKey(e)) e.preventDefault(); return; }
     if (G.phase !== 'play') return;
     if (e.code === 'Space') e.preventDefault();
-    if (e.repeat && ['KeyE', 'KeyM', 'KeyP', 'KeyN', 'KeyV', 'Tab', 'Escape', 'Space'].includes(e.code)) return;
+    if (e.repeat && ['KeyE', 'KeyM', 'KeyP', 'KeyN', 'KeyV', 'KeyC', 'Tab', 'Escape', 'Space'].includes(e.code)) return;
     keys.add(e.code);
     if (e.code === 'KeyE') interact();
     else if (e.code === 'KeyM') UI().openMap();
     else if (e.code === 'KeyP') UI().cyclePattern();
     else if (e.code === 'KeyN') UI().cycleMotion();
+    else if (e.code === 'KeyC') G.setView(G.state.settings.view === 'third' ? 'first' : 'third');
     else if (e.code === 'KeyV' && G.zone.exhibit) G.showcase(G.zone.exhibit);
     else if (e.code === 'Tab') UI().openJournal();
     else if (e.code === 'Escape') { if (performance.now() - G.lockLostAt > 400) UI().openPause(); }
@@ -5373,12 +5656,44 @@ CFT.loadModels = onProgress => {
     bob += (target - bob) * Math.min(1, dt * 12);
     if (P().distance >= 750) G.award('walker');
   }
+  // Third-person view (C): the camera sits 3.2 m behind the visitor's head and a little to the right, pulled in
+  // wherever a wall, column or ceiling would come between them.
+  const TP_DIST = 3.2, TP_SIDE = 0.45;
+  let tpDist = TP_DIST;
   function applyCamera(dt) {
     const p = G.player, target = p.pos.y + EYE + bob;
     G.camY += (target - G.camY) * (p.onGround ? Math.min(1, dt * 14) : 1);
-    camera.position.set(p.pos.x, G.camY, p.pos.z);
+    if (G.state.settings.view !== 'third' || G.phase === 'cinematic') {
+      camera.position.set(p.pos.x, G.camY, p.pos.z);
+      camera.rotation.set(p.pitch, p.yaw, 0);
+      return;
+    }
+    const cp = Math.cos(p.pitch), dx = -Math.sin(p.yaw) * cp, dy = Math.sin(p.pitch), dz = -Math.cos(p.yaw) * cp;
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw), w = G.world, zone = w.zoneAt(p.pos.x, p.pos.z), inside = zone.id !== 'plaza';
+    const room = zone.exhibit ? zone.exhibit.room : null;   // in a hall, the camera stays inside it (not out through the glass front)
+    const at = d => ({ x: p.pos.x - dx * d + rx * TP_SIDE * d / TP_DIST, y: G.camY + 0.3 - dy * d, z: p.pos.z - dz * d + rz * TP_SIDE * d / TP_DIST });
+    let free = 0.4;
+    for (let d = 0.4; d <= TP_DIST + 0.01; d += 0.2) {
+      const c = at(d + 0.3), f = w.floorAt(c.x, c.z);
+      if (f === null || c.y < f + 0.25 || (inside && c.y > w.TOP - 0.25)) break;
+      if (room && !(c.x > room.x0 + 0.3 && c.x < room.x1 - 0.3 && c.z > room.z0 + 0.3 && c.z < room.z1 - 0.3)) break;
+      free = d;
+    }
+    tpDist = free < tpDist ? free : tpDist + (free - tpDist) * Math.min(1, dt * 4);
+    const c = at(tpDist);
+    camera.position.set(c.x, c.y, c.z);
     camera.rotation.set(p.pitch, p.yaw, 0);
   }
+  G.setView = function (v) {
+    G.state.settings.view = v; tpDist = 0.4; G.save();
+    const el = $('set-view'); if (el) el.checked = v === 'third';
+    UI().toast('Camera', v === 'third' ? 'Third-person view · press C for first person' : 'First-person view · press C for third person');
+  };
+  G.applyPeople = function () {
+    if (!G.people) return;
+    G.people.guideOn = G.state.settings.guide !== false;
+    G.people.crowdOn = G.state.settings.crowd !== false;
+  };
   function placePlayer(x, y, z, yaw, pitch) {
     const p = G.player;
     p.pos.set(x, y, z); p.vx = p.vz = p.vy = 0; p.onGround = true; p.yaw = yaw; p.pitch = pitch || 0;
@@ -5736,6 +6051,7 @@ CFT.loadModels = onProgress => {
     }
     eyePos.set(G.player.pos.x, G.player.pos.y + EYE, G.player.pos.z);
     G.world.update(dt, eyePos, camera);
+    if (G.people) G.people.update(dt, { phase: G.phase, player: G.player, camera, thirdPerson: G.state.settings.view === 'third', routePoints: G.routePoints });
     UI().tick(dt);
     if (UI().isOpen('map')) UI().drawMap();
     if (G.usePost) post.c.render(dt); else renderer.render(scene, camera);
@@ -5766,6 +6082,7 @@ CFT.loadModels = onProgress => {
       throw err;
     }
     post = makePost();
+    try { G.people = CFT.People(scene, G.world); G.applyPeople(); } catch (err) { console.warn('The people could not be added.', err); }
     applyQuality(G.state.settings.quality);
     G.world.setSky(G.state.settings.sky);
     // Compile every shader now, behind the loading screen, instead of freezing on the first title frame.
