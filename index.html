@@ -636,7 +636,6 @@
         <label class="setting"><span>Tour guide robot</span><input type="checkbox" id="set-guide"></label>
         <label class="setting"><span>Guide robot colour</span><select id="set-guide-color"><option value="yellow">CFT Yellow</option><option value="white">White</option><option value="black">Black</option><option value="olive">Olive Green</option></select></label>
         <label class="setting"><span>Show guide robot rig (bones)</span><input type="checkbox" id="set-guide-rig"></label>
-        <label class="setting"><span>Other visitors</span><input type="checkbox" id="set-crowd"></label>
       </div>
       <h3 class="section-label">Controls</h3>
       <div id="controls-pause"></div>
@@ -4810,7 +4809,7 @@ CFT.loadModels = onProgress => {
     const S = G().state.settings;
     $('set-sens').value = S.sensitivity; $('set-vol').value = S.volume;
     $('set-voice').checked = S.voice; $('set-invert').checked = S.invertY;
-    $('set-view').checked = S.view === 'third'; $('set-guide').checked = S.guide !== false; $('set-crowd').checked = S.crowd !== false;
+    $('set-view').checked = S.view === 'third'; $('set-guide').checked = S.guide !== false;
     $('set-guide-color').value = S.guideColor || 'yellow'; $('set-guide-rig').checked = !!S.guideRig;
     $('set-quality').value = S.quality;
     const g = G();
@@ -4839,7 +4838,6 @@ CFT.loadModels = onProgress => {
     $('set-guide').onchange = e => { S().guide = e.target.checked; G().applyPeople(); G().save(); };
     $('set-guide-color').onchange = e => { S().guideColor = e.target.value; G().applyPeople(); G().save(); };
     $('set-guide-rig').onchange = e => { S().guideRig = e.target.checked; G().applyPeople(); G().save(); };
-    $('set-crowd').onchange = e => { S().crowd = e.target.checked; G().applyPeople(); G().save(); };
     $('set-quality').onchange = e => G().setQuality(e.target.value, true);
     $('set-sky').onchange = e => { S().sky = e.target.value; G().world.setSky(S().sky); G().save(); };
   }
@@ -5020,14 +5018,12 @@ CFT.loadModels = onProgress => {
 </script>
 <script>
 // CFT Kinetic — people: the tour guide robot, the visitor's own body (third-person view) and other visitors.
-// The guide is the CFT GUIDE robot from the team's concept sheet, built here like everyone else: people are simple
-// figures walked by a coded stride, in keeping with the museum's other procedural pieces.
+// The guide is the CFT GUIDE robot from the team's concept sheet. The only person is the visitor's own figure, seen in
+// the third-person view, walked by a coded stride. (The other visitors were removed on 2026-09-18 at the user's request.)
 (function () {
   const T = THREE, V = (x, y, z) => new T.Vector3(x, y, z);
   const mats = {};
   const mat = (c, rough) => mats[c + ':' + (rough || 0.6)] || (mats[c + ':' + (rough || 0.6)] = new T.MeshStandardMaterial({ color: c, roughness: rough || 0.6 }));
-  const rand = (a, b) => a + Math.random() * (b - a);
-  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 
   // ------------------------------------------------ The CFT GUIDE robot (the team's concept sheet, 2026-09-18)
   // A rigged robot: a skeleton of named bones (cg_root, cg_hips, cg_spine, cg_neck, cg_head, cg_browL/R, cg_eyeL/R,
@@ -5373,89 +5369,18 @@ CFT.loadModels = onProgress => {
       }
     };
   }
-  const SKIN = [0xF1C9A5, 0xE3B38F, 0xC98E66, 0xA8714F, 0x7A4E36, 0x5A3825];
-  const HAIR = [0x1B1512, 0x3B2A1E, 0x6B4A2E, 0xA07A4E, 0x2A2A2A, 0xC9C2B8];
-  const SHIRT = [0xFECC00, 0x2F6FDB, 0xE85D4A, 0x3FA37A, 0xF4F4F4, 0x2A2E35, 0x8A5CC7, 0xE17924, 0x5FB8D8, 0xD9486F];
-  const PANTS = [0x2A3342, 0x1F2226, 0x4A5566, 0x6B5A48, 0x303A2E, 0xC9C2B0];
-  const randomLook = () => ({ skin: pick(SKIN), hair: pick(HAIR), shirt: pick(SHIRT), pants: pick(PANTS), height: rand(1.58, 1.9), longHair: Math.random() < 0.45, longSleeves: Math.random() < 0.4 });
 
   // Turn an angle smoothly toward a target (shortest way round).
   const turn = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
 
   CFT.People = function (scene, world) {
-    const people = { guideOn: true, crowdOn: true };
+    const people = { guideOn: true };
     const FLOOR = world.FLOOR;
 
     // ------------------------------------------------ The visitor's own body, seen in the third-person view
     const me = makeHuman({ skin: 0xE3B38F, hair: 0x2B1D14, shirt: 0xFECC00, pants: 0x1F2226, height: 1.78, longSleeves: false });
     me.root.visible = false; scene.add(me.root);
     let meSpeed = 0; const meLast = V(0, 0, 0);
-
-    // ------------------------------------------------ Other visitors
-    const crowd = [];
-    function viewingSpot(ex) {
-      // To one side of the centre line, so nobody stands where the visitor lands when jumping to the installation.
-      const lat = V(ex.front.z, 0, -ex.front.x), d = Math.min(ex.radius + 1.4, 4.4) + rand(0, 1.4), o = (Math.random() < 0.5 ? -1 : 1) * rand(1.6, 2.8);
-      return { x: ex.pos.x + ex.front.x * d + lat.x * o, z: ex.pos.z + ex.front.z * d + lat.z * o };
-    }
-    function planTrip(v) {
-      const exs = world.exhibits;
-      if (!exs.length) return;
-      let ex = null;
-      if (Math.random() > 0.15) { do { ex = pick(exs); } while (exs.length > 1 && ex === v.ex); }
-      const pts = world.routeTo(v.pos, world.zoneAt(v.pos.x, v.pos.z), ex);
-      if (ex) pts[pts.length - 1] = viewingSpot(ex);
-      else { const a = rand(0, Math.PI * 2), r = rand(11.5, 12.3); pts[pts.length - 1] = { x: Math.sin(a) * r, z: Math.cos(a) * r }; }
-      v.ex = ex; v.path = pts.slice(1); v.i = 0;
-    }
-    function spawnCrowd(n) {
-      const exs = world.exhibits;
-      for (let k = 0; k < n; k++) {
-        const h = makeHuman(randomLook()), ex = exs[k % exs.length];
-        const s = k < exs.length ? viewingSpot(ex) : (() => { const a = rand(0, Math.PI * 2); return { x: Math.sin(a) * 11.8, z: Math.cos(a) * 11.8 }; })();
-        const v = { h, pos: V(s.x, FLOOR, s.z), heading: 0, speed: 0, walk: rand(1.05, 1.4), path: null, i: 0, ex: k < exs.length ? ex : null, wait: rand(2, 14), col: { x: s.x, z: s.z, r: 0.28 } };
-        v.heading = v.ex ? Math.atan2(v.ex.pos.x - s.x, v.ex.pos.z - s.z) : Math.atan2(-s.x, -s.z);
-        h.root.position.copy(v.pos); h.root.rotation.y = v.heading;
-        scene.add(h.root); world.colliders.push(v.col); crowd.push(v);
-      }
-    }
-    function updateCrowd(dt, ctx) {
-      const pl = ctx.player.pos;
-      crowd.forEach(v => {
-        v.h.root.visible = people.crowdOn && ctx.show;
-        if (!people.crowdOn) { v.col.x = v.col.z = 1e6; return; }   // switched off: park the collision spot far away
-        let moving = false;
-        if (ctx.live) {
-          if (v.wait > 0) {
-            v.wait -= dt;
-            // Someone standing right beside the visitor moves on to the next installation.
-            if (Math.hypot(pl.x - v.pos.x, pl.z - v.pos.z) < 1.2 && v.wait > 0.5) v.wait = 0.5;
-            if (v.wait <= 0) planTrip(v);
-          } else if (v.path && v.i < v.path.length) {
-            const t = v.path[v.i], dx = t.x - v.pos.x, dz = t.z - v.pos.z, d = Math.hypot(dx, dz);
-            const px = pl.x - v.pos.x, pz = pl.z - v.pos.z, pd = Math.hypot(px, pz);
-            const blocked = pd < 1.0 && (px * dx + pz * dz) / (pd * d || 1) > 0.3;   // wait for the visitor ahead to pass
-            if (d < 0.3) { v.i++; if (v.i >= v.path.length) v.wait = rand(6, 16); }
-            else if (!blocked) {
-              const step = Math.min(d, v.walk * dt);
-              v.pos.x += dx / d * step; v.pos.z += dz / d * step;
-              v.heading = turn(v.heading, Math.atan2(dx, dz), Math.min(1, dt * 6));
-              moving = true;
-            }
-          } else v.wait = rand(4, 10);
-          // Standing still: look at the installation (or the globe from the lobby).
-          if (!moving && v.wait > 0) {
-            const fx = v.ex ? v.ex.pos.x : 0, fz = v.ex ? v.ex.pos.z : 0;
-            v.heading = turn(v.heading, Math.atan2(fx - v.pos.x, fz - v.pos.z), Math.min(1, dt * 2));
-          }
-        }
-        v.speed += ((moving ? v.walk : 0) - v.speed) * Math.min(1, dt * 8);
-        v.col.x = v.pos.x; v.col.z = v.pos.z;
-        const near = ctx.camera.position.distanceToSquared(v.pos) < 70 * 70;
-        v.h.root.position.set(v.pos.x, FLOOR, v.pos.z); v.h.root.rotation.y = v.heading;
-        if (near) v.h.update(dt, v.speed);
-      });
-    }
 
     // ------------------------------------------------ The tour guide robot
     let guide = null;
@@ -5551,8 +5476,6 @@ CFT.loadModels = onProgress => {
     people.update = function (dt, ctx) {
       ctx.live = ctx.phase === 'play';
       ctx.show = ctx.phase !== 'showcase' && ctx.phase !== 'loading';
-      if (!crowd.length && world.exhibits.length) spawnCrowd(14);
-      updateCrowd(dt, ctx);
       if (guide) updateGuide(dt, ctx);
       const p = ctx.player;
       me.root.visible = !!ctx.thirdPerson && ctx.show && ctx.phase !== 'title' && ctx.phase !== 'cinematic';
@@ -5627,7 +5550,7 @@ CFT.loadModels = onProgress => {
   const G = CFT.G = {
     state: {
       progress: freshProgress(),
-      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'night', seaSky: true, nightSky: true, view: 'first', guide: true, crowd: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.nightSky ? { sky: 'night', seaSky: true, nightSky: true } : null)
+      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'night', seaSky: true, nightSky: true, view: 'first', guide: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.nightSky ? { sky: 'night', seaSky: true, nightSky: true } : null)
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     player: { pos: new T.Vector3(0, 0, 54), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
@@ -6144,7 +6067,6 @@ CFT.loadModels = onProgress => {
   G.applyPeople = function () {
     if (!G.people) return;
     G.people.guideOn = G.state.settings.guide !== false;
-    G.people.crowdOn = G.state.settings.crowd !== false;
     if (G.people.setGuideColor) G.people.setGuideColor(G.state.settings.guideColor || 'yellow');
     if (G.people.showRig) G.people.showRig(!!G.state.settings.guideRig);
   };
