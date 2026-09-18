@@ -3737,7 +3737,7 @@ CFT.loadModels = onProgress => {
   // Landing pad (the AEGIS game's starting platform): an octagon out at sea south of the deck, joined to it by a
   // covered bridge. The visit starts here, looking up the bridge at the museum.
   const PAD = { cx: 0, apo: 22, BW: 5 };
-  PAD.cz = SEA.cz + SEA.apo + 26 + PAD.apo; PAD.near = PAD.cz - PAD.apo; PAD.spawnZ = PAD.cz - 12;
+  PAD.cz = SEA.cz + SEA.apo + 8 + PAD.apo; PAD.near = PAD.cz - PAD.apo; PAD.spawnZ = PAD.cz - 14;   // a short 8 m bridge
   const onPad = (x, z, m) => {
     const dx = Math.abs(x - PAD.cx), dz = Math.abs(z - PAD.cz), a = PAD.apo - m;
     return dx < a && dz < a && (dx + dz) < a * Math.SQRT2;
