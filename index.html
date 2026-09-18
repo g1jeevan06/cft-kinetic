@@ -3734,11 +3734,161 @@ CFT.loadModels = onProgress => {
     }
     return false;
   };
+  // Landing pad (the AEGIS game's starting platform): an octagon out at sea south of the deck, joined to it by a
+  // covered bridge. The visit starts here, looking up the bridge at the museum.
+  const PAD = { cx: 0, apo: 22, BW: 5 };
+  PAD.cz = SEA.cz + SEA.apo + 26 + PAD.apo; PAD.near = PAD.cz - PAD.apo; PAD.spawnZ = PAD.cz - 12;
+  const onPad = (x, z, m) => {
+    const dx = Math.abs(x - PAD.cx), dz = Math.abs(z - PAD.cz), a = PAD.apo - m;
+    return dx < a && dz < a && (dx + dz) < a * Math.SQRT2;
+  };
+  const onPadBridge = (x, z) => Math.abs(x - PAD.cx) < PAD.BW / 2 - 0.45 && z > SEA.cz + SEA.apo - 1.5 && z < PAD.near + 1.5;
   // Inside the deck's octagon (flat sides facing the four axes), m metres in from its edge.
   const onDeck = (x, z, m) => {
     const dx = Math.abs(x - SEA.cx), dz = Math.abs(z - SEA.cz), a = SEA.apo - m;
     return dx < a && dz < a && (dx + dz) * Math.SQRT1_2 < a;
   };
+  // The landing pad the visit starts on, after the AEGIS game's Landing Platform: an octagonal deck on four legs
+  // with a helipad (yellow ring, white ring, cyan edge lights, H mark) and a parked VTOL aircraft, a glass control
+  // booth with the pad's sign, cargo containers and crates, a charging post, four floodlight masts with blinking
+  // red lights, and a covered bridge of white arches up to the museum deck.
+  function buildPad(A, M, scene, world, TX, K) {
+    const { cx, cz, apo, BW } = PAD, R = apo / Math.cos(Math.PI / 8);
+    const oct = k => { const f = Math.PI / 8 + k * Math.PI / 4; return [cx + Math.sin(f) * R, cz + Math.cos(f) * R]; };
+    A.add(new T.CylinderGeometry(R, R, 1.6, 8), M.paving, cx, -0.8, cz, Math.PI / 8);
+    A.add(new T.CylinderGeometry(R - 1, R - 5, 3.4, 8), K.hullM, cx, -3.3, cz, Math.PI / 8);
+    A.add(new T.CylinderGeometry(R - 1.6, R - 2.2, 0.7, 8, 1, true), K.bandM, cx, -2.2, cz, Math.PI / 8);
+    for (let k = 0; k < 4; k++) {
+      const f = Math.PI / 4 + k * Math.PI / 2, lx = cx + Math.sin(f) * (R - 8), lz = cz + Math.cos(f) * (R - 8), top = -5;
+      A.add(new T.BoxGeometry(5, top - SEA.water, 5), K.hullM, lx, (top + SEA.water) / 2, lz, f);
+      A.add(Geo.roundedBox(8, 2.4, 8, 0.5), K.hullM, lx, SEA.water + 0.5, lz, f);
+      A.add(new T.CircleGeometry(0.8, 16), K.thrM, lx + Math.sin(f) * 4.05, SEA.water + 0.6, lz + Math.cos(f) * 4.05, f);
+      const h = new T.Mesh(new T.PlaneGeometry(12, 12), K.wHalo); h.rotation.x = -Math.PI / 2; h.position.set(lx + Math.sin(f) * 7, SEA.water + 0.05, lz + Math.cos(f) * 7); scene.add(h);
+    }
+    // Edge: glowing line under the lip, glass rail with a white top rail, open on the side facing the museum.
+    for (let k = 0; k < 8; k++) {
+      const [x0, z0] = oct(k), [x1, z1] = oct(k + 1), L = Math.hypot(x1 - x0, z1 - z0), ry = Math.atan2(-(z1 - z0), x1 - x0);
+      const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, nx = mx - cx, nz = mz - cz, nl = Math.hypot(nx, nz), ix = -nx / nl * 0.6, iz = -nz / nl * 0.6;
+      A.add(new T.BoxGeometry(L, 0.06, 0.06), M.glowGold, mx, -0.05, mz, ry);
+      if (nz / nl < -0.99) {
+        const hw = BW / 2 + 0.2;
+        [[mx - L / 2 + 0.5, cx - hw], [cx + hw, mx + L / 2 - 0.5]].forEach(([a, b]) => {
+          A.add(new T.BoxGeometry(b - a, 1.1, 0.04), M.glass, (a + b) / 2, 0.6, mz + iz);
+          A.add(new T.BoxGeometry(b - a, 0.07, 0.1), M.white, (a + b) / 2, 1.18, mz + iz);
+        });
+      } else {
+        A.add(new T.BoxGeometry(L - 1, 1.1, 0.04), M.glass, mx + ix, 0.6, mz + iz, ry);
+        A.add(new T.BoxGeometry(L - 1, 0.07, 0.1), M.white, mx + ix, 1.18, mz + iz, ry);
+      }
+      for (let t = 0.1; t < 1; t += 0.2) A.add(new T.BoxGeometry(0.08, 1.1, 0.08), M.white, x0 + (x1 - x0) * t + ix, 0.6, z0 + (z1 - z0) * t + iz);
+    }
+    // Helipad markings.
+    const hy = 0.012, pc = cz + 2;
+    const yellowM = new T.MeshBasicMaterial({ color: 0xE8C23A }), lineM = new T.MeshBasicMaterial({ color: 0xF2F4F6 });
+    [[8.6, 9.0, yellowM], [6.3, 6.45, lineM], [9.3, 9.36, M.glowGold]].forEach(([r0, r1, m]) => A.add(new T.RingGeometry(r0, r1, 96), m, cx, hy, pc, 0, -Math.PI / 2));
+    A.add(new T.PlaneGeometry(0.5, 4.4), yellowM, cx - 2, hy, pc, 0, -Math.PI / 2);
+    A.add(new T.PlaneGeometry(0.5, 4.4), yellowM, cx + 2, hy, pc, 0, -Math.PI / 2);
+    A.add(new T.PlaneGeometry(4, 0.5), yellowM, cx, hy, pc, 0, -Math.PI / 2);
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; A.add(new T.CylinderGeometry(0.14, 0.14, 0.06, 10), M.glowWarm, cx + Math.sin(a) * 10.2, 0.03, pc + Math.cos(a) * 10.2); }
+    // Parked VTOL aircraft: white fuselage, dark canopy, a wing each side with two ducted rotors, twin tail fins.
+    const ac = new T.Group(); ac.position.set(cx + 0.5, 0, pc + 0.5); ac.rotation.y = Math.PI * 0.85; scene.add(ac);
+    const acM = new T.MeshStandardMaterial({ color: 0xF4F6F8, roughness: 0.25, metalness: 0.3 });
+    const canM = new T.MeshStandardMaterial({ color: 0x14202A, roughness: 0.08, metalness: 0.7 });
+    const wingM = new T.MeshStandardMaterial({ color: 0x1E2A36, roughness: 0.4, metalness: 0.5 });
+    const body = new T.Mesh(new T.SphereGeometry(1, 28, 16), acM); body.position.y = 1.5; body.scale.set(0.95, 0.85, 3.4); ac.add(body);
+    const can = new T.Mesh(new T.SphereGeometry(0.9, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), canM); can.scale.set(0.85, 0.7, 1.6); can.position.set(0, 1.95, 1.7); ac.add(can);
+    const wing = new T.Mesh(new T.BoxGeometry(9.4, 0.14, 1.3), wingM); wing.position.set(0, 1.7, 0.2); ac.add(wing);
+    const rotors = [];
+    [-1, 1].forEach(sx => [-1.4, 1.8].forEach(oz => {
+      const duct = new T.Mesh(new T.TorusGeometry(1.15, 0.13, 8, 32), acM); duct.rotation.x = Math.PI / 2; duct.position.set(sx * 3.6, 1.72, oz); ac.add(duct);
+      const hub = new T.Group(); hub.position.set(sx * 3.6, 1.72, oz); ac.add(hub);
+      [0, 1, 2].forEach(b => { const bl = new T.Mesh(new T.BoxGeometry(2.1, 0.03, 0.18), wingM); bl.rotation.y = b * Math.PI / 3; hub.add(bl); });
+      rotors.push(hub);
+      const arm = new T.Mesh(new T.BoxGeometry(0.2, 0.12, Math.abs(oz) - 0.2), wingM); arm.position.set(sx * 3.6, 1.7, oz / 2 + 0.1); ac.add(arm);
+    }));
+    [-0.5, 0.5].forEach(sx => { const fin = new T.Mesh(new T.BoxGeometry(0.1, 1.5, 1.1), acM); fin.position.set(sx, 2.4, -3.1); fin.rotation.z = sx * 0.5; ac.add(fin); });
+    [[-0.7, 1.6], [0.7, 1.6], [0, -2.2]].forEach(([x, z]) => { const g = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 0.7, 6), wingM); g.position.set(x, 0.35, z); ac.add(g); });
+    world.colliders.push({ x: cx + 0.5, z: pc + 0.5, r: 3.4 });
+    // Glass control booth with a white roof, a cyan ring and the pad's sign above it.
+    const bx = cx - 13, bz = cz - 9;
+    A.add(new T.CylinderGeometry(2.6, 2.6, 0.3, 6), M.base, bx, 0.15, bz, 0.3);
+    A.add(new T.CylinderGeometry(2.45, 2.45, 2.6, 6, 1, true), M.glass, bx, 1.6, bz, 0.3);
+    for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + 0.3; A.add(new T.BoxGeometry(0.12, 2.6, 0.12), M.white, bx + Math.sin(a) * 2.45, 1.6, bz + Math.cos(a) * 2.45); }
+    A.add(new T.CylinderGeometry(2.8, 2.8, 0.3, 6), M.white, bx, 3.05, bz, 0.3);
+    A.add(new T.CylinderGeometry(2.82, 2.82, 0.04, 6), M.glowGold, bx, 2.88, bz, 0.3);
+    A.add(new T.BoxGeometry(1.4, 0.9, 0.6), M.metal, bx, 0.75, bz);
+    world.colliders.push({ x: bx, z: bz, r: 2.6 });
+    const signTex = (() => {
+      const c = document.createElement('canvas'); c.width = 1024; c.height = 256; const g = c.getContext('2d');
+      g.fillStyle = '#0E1822'; g.fillRect(0, 0, 1024, 256); g.fillStyle = '#FECC00'; g.fillRect(0, 244, 1024, 12);
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = '#E8F6FF'; g.font = '600 70px "Helvetica Neue", Helvetica, Arial, sans-serif'; g.fillText('CFT KINETIC LANDING PAD', 512, 96);
+      g.fillStyle = '#4FF2FF'; g.font = '500 40px "Helvetica Neue", Helvetica, Arial, sans-serif'; g.fillText('PAD 01 · WELCOME ABOARD', 512, 186);
+      const t = new T.CanvasTexture(c); t.encoding = T.sRGBEncoding; t.anisotropy = 8; return t;
+    })();
+    const sign = new T.Mesh(new T.PlaneGeometry(6.4, 1.6), new T.MeshBasicMaterial({ map: signTex, toneMapped: false }));
+    sign.position.set(bx + 0.6, 4.3, bz + 0.4); sign.rotation.y = 0.35; scene.add(sign);
+    [-1.5, 1.5].forEach(o => A.add(new T.BoxGeometry(0.1, 1.3, 0.1), M.metal, bx + 0.6 + o * Math.cos(0.35), 3.55, bz + 0.4 - o * Math.sin(0.35)));
+    // Cargo: two containers and a stack of crates by the rail, and a charging post.
+    const cont = (x, z, ry, col) => {
+      const cm = new T.MeshStandardMaterial({ color: col, roughness: 0.6, metalness: 0.4 });
+      A.add(new T.BoxGeometry(2.44, 2.6, 6.06), cm, x, 1.3, z, ry);
+      for (let i = -2; i <= 2; i++) A.add(new T.BoxGeometry(2.5, 2.3, 0.08), cm, x + Math.sin(ry) * i * 1.2, 1.3, z + Math.cos(ry) * i * 1.2, ry);
+      world.colliders.push({ x, z, r: 3.1 });
+    };
+    cont(cx + 14, cz - 11, -0.2, 0xE9ECEF); cont(cx + 16.5, cz - 3, Math.PI / 2 + 0.1, 0x2F3A44);
+    const crateM = new T.MeshStandardMaterial({ map: TX.wood, color: 0xB89868, roughness: 0.7 });
+    [[11, -13.5, 0.4, 1.2], [12.5, -14.5, 0.1, 0.8], [11.1, -13.6, 0.3, 0.7]].forEach(([x, z, ry, sz], i) => A.add(new T.BoxGeometry(sz, sz, sz), crateM, cx + x, sz / 2 + (i === 2 ? 1.2 : 0), cz + z, ry));
+    world.colliders.push({ x: cx + 11.8, z: cz - 14, r: 1.3 });
+    A.add(Geo.roundedBox(1.0, 2.2, 0.7, 0.1), M.white, cx + 9, 1.1, cz + 12);
+    A.add(new T.PlaneGeometry(0.6, 0.8), M.glowGold, cx + 9, 1.6, cz + 11.64, Math.PI);
+    world.colliders.push({ x: cx + 9, z: cz + 12, r: 0.7 });
+    // Floodlight masts with a red blinking light on top; their light pools show at night.
+    const blinkM = new T.MeshBasicMaterial({ color: 0xFF3020, toneMapped: false }), blinks = [];
+    [[-17, -4], [17, -4], [-17, 10], [17, 10]].forEach(([x, z]) => {
+      x += cx; z += cz;
+      A.add(new T.CylinderGeometry(0.5, 0.5, 0.4, 12), K.postM, x, 0.2, z);
+      A.add(new T.CylinderGeometry(0.1, 0.14, 8, 10), K.postM, x, 4.2, z);
+      A.add(new T.BoxGeometry(1.2, 0.3, 0.5), K.postM, x, 8.2, z);
+      A.add(new T.BoxGeometry(1.0, 0.02, 0.36), M.glowWarm, x, 8.04, z);
+      const b = new T.Mesh(new T.SphereGeometry(0.14, 10, 8), blinkM); b.position.set(x, 8.5, z); scene.add(b); blinks.push(b);
+      world.colliders.push({ x, z, r: 0.55 });
+      const p = new T.Mesh(new T.PlaneGeometry(14, 14), K.poolM); p.rotation.x = -Math.PI / 2; p.position.set(x, 0.03, z); p.renderOrder = 2; K.nightPools.add(p);
+    });
+    // Covered bridge up to the museum deck: deck, centre grating, glass rails, cyan edge lines, a white arch every
+    // 4 m with a lamp at its crown, piers down to the sea, and a gateway arch at each end.
+    const z0 = SEA.cz + SEA.apo - 0.5, z1 = PAD.near + 0.5, L = z1 - z0, zc = (z0 + z1) / 2, hw = BW / 2;
+    A.add(new T.BoxGeometry(BW + 0.2, 0.6, L), K.deckM, cx, -0.3, zc);
+    A.add(new T.PlaneGeometry(1.2, L), K.postM, cx, 0.006, zc, 0, -Math.PI / 2);
+    [-1, 1].forEach(sd => {
+      A.add(new T.BoxGeometry(0.05, 1.1, L), M.glass, cx + sd * (hw - 0.1), 0.55, zc);
+      A.add(new T.BoxGeometry(0.1, 0.07, L), M.white, cx + sd * (hw - 0.1), 1.12, zc);
+      A.add(new T.BoxGeometry(0.05, 0.02, L), M.glowGold, cx + sd * (hw - 0.3), 0.012, zc);
+      A.add(new T.BoxGeometry(0.2, 0.7, L), M.white, cx + sd * (hw + 0.05), -0.4, zc);
+      A.add(new T.BoxGeometry(0.02, 0.04, L), M.glowGold, cx + sd * (hw + 0.16), -0.5, zc);
+    });
+    const arches = Math.floor(L / 4);
+    for (let i = 0; i <= arches; i++) {
+      const z = z0 + 1 + (L - 2) * i / arches;
+      A.add(new T.TorusGeometry(hw + 0.05, 0.09, 6, 28, Math.PI), M.white, cx, 0, z);
+      A.add(new T.SphereGeometry(0.08, 8, 6), M.glowWarm, cx, hw + 0.14, z);
+    }
+    [z0 + L * 0.35, z0 + L * 0.7].forEach(z => {
+      [-1, 1].forEach(sd => A.add(new T.CylinderGeometry(0.55, 0.7, -0.6 - SEA.water, 12), K.hullM, cx + sd * 1.7, (SEA.water - 0.6) / 2, z));
+      A.add(new T.BoxGeometry(4.2, 0.4, 0.6), K.hullM, cx, -0.8, z);
+    });
+    [z0 + 0.4, z1 - 0.4].forEach(z => {
+      [-1, 1].forEach(sd => A.add(Geo.roundedBox(0.35, 4.0, 0.5, 0.12), M.white, cx + sd * (hw + 0.2), 2.0, z));
+      A.add(Geo.roundedBox(BW + 0.9, 0.35, 0.5, 0.12), M.white, cx, 4.1, z);
+      A.add(new T.BoxGeometry(BW, 0.03, 0.3), M.glowGold, cx, 3.92, z);
+    });
+    let t = 0;
+    world.animated.push({ update(dt) {
+      t += dt;
+      rotors.forEach((r, i) => { r.rotation.y += dt * (0.6 + (i % 2) * 0.2); });
+      const on = (t % 2) < 0.25; blinks.forEach(b => { b.visible = on; });
+    } });
+  }
   function buildSea(A, M, D, scene, world, TX) {
     const { cx, cz, R } = SEA, oct = k => { const f = Math.PI / 8 + k * Math.PI / 4; return [cx + Math.sin(f) * R, cz + Math.cos(f) * R]; };
     // Deck and the dock ring below it.
@@ -3784,6 +3934,13 @@ CFT.loadModels = onProgress => {
           A.box(M.glass, 0.04, 1.1, b - a, mx + ix, 0.6, (a + b) / 2);
           A.box(M.white, 0.1, 0.07, b - a, mx + ix, 1.18, (a + b) / 2);
         });
+      } else if (nz / nl > 0.99) {
+        // South side: open in the middle where the landing-pad bridge joins.
+        const hw = PAD.BW / 2 + 0.2, x0s = mx - L / 2 + 0.5, x1s = mx + L / 2 - 0.5;
+        [[x0s, PAD.cx - hw], [PAD.cx + hw, x1s]].forEach(([a, b]) => {
+          A.box(M.glass, b - a, 1.1, 0.04, (a + b) / 2, 0.6, mz + iz);
+          A.box(M.white, b - a, 0.07, 0.1, (a + b) / 2, 1.18, mz + iz);
+        });
       } else {
         A.box(M.glass, L - 1, 1.1, 0.04, mx + ix, 0.6, mz + iz, ry);
         A.box(M.white, L - 1, 0.07, 0.1, mx + ix, 1.18, mz + iz, ry);
@@ -3803,7 +3960,9 @@ CFT.loadModels = onProgress => {
     const lineM = new T.LineBasicMaterial({ color: 0x9AA6AA, transparent: true, opacity: 0.55 });
     const buoys = [], tethers = [];
     for (let i = 0; i < 18; i++) {
-      const a = i / 18 * Math.PI * 2 + Geo.hash(i, 1, 81) * 0.2, d = R + 16 + Geo.hash(i, 2, 81) * 26;
+      let a = i / 18 * Math.PI * 2 + Geo.hash(i, 1, 81) * 0.2; const d = R + 16 + Geo.hash(i, 2, 81) * 26;
+      // Keep clear of the landing pad and its bridge (due south).
+      if (Math.abs(Math.sin(a)) * d < PAD.apo + 8 && Math.cos(a) > 0) a += (Math.sin(a) < 0 ? -1 : 1) * 0.5;
       const g = new T.Group(); g.position.set(cx + Math.sin(a) * d, SEA.water, cz + Math.cos(a) * d);
       const body = new T.Mesh(new T.CylinderGeometry(0.7, 0.9, 1.2, 16), buoyM); body.position.y = 0.3; g.add(body);
       const lamp = new T.Mesh(new T.CylinderGeometry(0.72, 0.72, 0.12, 24), lampM); lamp.position.y = 0.96; g.add(lamp);
@@ -3884,6 +4043,7 @@ CFT.loadModels = onProgress => {
       for (let t = 0.2; t < 0.9; t += 0.3) far.add(new T.CylinderGeometry(0.7, 0.9, -0.6 - SEA.water, 10), hullM, x0 + (x1 - x0) * t, (SEA.water - 0.6) / 2, z);
     }));
     [[-210, -270, 22], [240, -310, 18], [-370, 170, 24], [340, 240, 20], [40, -470, 26], [-80, 400, 18], [440, -60, 22], [-460, -40, 20]].forEach(([x, z, r]) => station(x, z, r, SEA.water + 11));
+    buildPad(far, M, scene, world, TX, { hullM, deckM, bandM, thrM, wHalo, postM, poolM, nightPools });
     far.build(scene);
     // A fast boat circling the station, trailing a white wake.
     const boat = new T.Group();
@@ -3927,7 +4087,7 @@ CFT.loadModels = onProgress => {
     // The night sky is the default; the day sea haze and the city panoramas stay selectable (Sky, pause menu).
     CFT.SKIES = Object.assign({ night: nightSkyURL(), sea: seaSkyURL() }, CFT.SKIES || {});
     const world = {
-      FLOOR, TOP, HALL, LOBBY_R, rooms: ROOMS, exhibits: [], colliders: [], kiosks: [], anchors: [], animated: [],
+      FLOOR, TOP, HALL, LOBBY_R, PAD, rooms: ROOMS, exhibits: [], colliders: [], kiosks: [], anchors: [], animated: [],
       doors: null, beacon: null, reflector: null, floorMats: [], quality: 'high'
     };
     world.env = buildEnvironment(renderer, scene);
@@ -4106,6 +4266,7 @@ CFT.loadModels = onProgress => {
       if (x > STEPS.x0 + 0.1 && x < STEPS.x1 - 0.1 && z >= STEPS.z0 && z < STEPS.z1) return FLOOR - 0.15 * (1 + Math.floor((z - STEPS.z0) / 0.3));
       if (onDeck(x, z, 1.1) && !inFootprint(x, z, PR)) return 0;
       if (onBridge(x, z)) return 0;
+      if (onPadBridge(x, z) || onPad(x, z, 1.1)) return 0;
       return null;
     };
 
@@ -4121,6 +4282,7 @@ CFT.loadModels = onProgress => {
         return { id: 'promenade', name: 'Exhibition Promenade' };
       }
       if (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < PORCH.z1) return { id: 'plaza', name: 'Entrance Porch' };
+      if (z > SEA.cz + SEA.apo - 1) return { id: 'plaza', name: z > PAD.near - 0.5 ? 'Landing Pad' : 'Pad Bridge' };
       if (Math.abs(x - SEA.cx) > SEA.apo - 1) return { id: 'plaza', name: Math.abs(x - SEA.cx) > SEA.SX - SEA.SR ? 'Sea Station' : 'Sea Bridge' };
       return { id: 'plaza', name: 'Entrance Plaza' };
     };
@@ -4128,6 +4290,7 @@ CFT.loadModels = onProgress => {
     // Waypoints from a position to an installation (or back to the lobby when ex is null).
     world.routeTo = function (from, zone, ex) {
       const pts = [{ x: from.x, z: from.z }];
+      if (from.z > SEA.cz + SEA.apo - 1) { if (from.z > PAD.near) pts.push({ x: PAD.cx, z: PAD.near + 2 }); pts.push({ x: PAD.cx, z: SEA.cz + SEA.apo - 4 }); }
       const outside = r => ({ x: r.door.x + r.f[0] * 1.8, z: r.door.z + r.f[1] * 1.8 });
       if (zone.id === 'plaza') { if (from.z > PORCH.z1 || Math.abs(from.x) > PORCH.x1) pts.push({ x: 0, z: 47.6 }); pts.push({ x: 0, z: 38 }); }
       if (zone.id === 'plaza' || zone.id === 'entrance') pts.push({ x: 0, z: 17 });
@@ -5573,7 +5736,12 @@ CFT.loadModels = onProgress => {
     const board = G.pendingBoard();
     if (board) {
       const from = G.player.pos, pts = [{ x: from.x, z: from.z }];
-      if (G.zone.id === 'plaza') { if (from.z > 45 || Math.abs(from.x) > 8) pts.push({ x: 0, z: 47.6 }); pts.push({ x: 0, z: 38 }); }
+      if (G.zone.id === 'plaza') {
+        const pad = G.world.PAD;
+        if (from.z > pad.near - 26) { if (from.z > pad.near) pts.push({ x: pad.cx, z: pad.near + 2 }); pts.push({ x: pad.cx, z: pad.near - 30 }); }
+        if (from.z > 45 || Math.abs(from.x) > 8) pts.push({ x: 0, z: 47.6 });
+        pts.push({ x: 0, z: 38 });
+      }
       else if (G.zone.exhibit || G.zone.room) { const back = G.world.routeTo(from, G.zone, null); back.pop(); pts.push(...back.slice(1), { x: 0, z: 17 }); }
       pts.push({ x: board.x, z: board.z });
       return pts;
@@ -6012,14 +6180,16 @@ CFT.loadModels = onProgress => {
   // ---------------------------------------------------------------- Cinematic (storyboard step 1)
   const cine = {
     t: 0, dur: 11,
-    path: new T.CatmullRomCurve3([new T.Vector3(28, 16, 112), new T.Vector3(13, 7, 84), new T.Vector3(3, 2.6, 62), new T.Vector3(0, EYE, 54)]),
-    look: new T.CatmullRomCurve3([new T.Vector3(0, 6, 41), new T.Vector3(0, 4.8, 41), new T.Vector3(0, 3.4, 40), new T.Vector3(0, EYE + 0.4, 40)]),
-    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Nine kinetic installations around one circular lobby.'], [7.4, 'The doors are opening. Welcome in.']],
+    // Flies in over the sea to the landing pad (as in the AEGIS game's opening), ending where the visit starts.
+    path: null, look: null,
+    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Nine kinetic installations around one circular lobby.'], [7.4, 'Welcome aboard. Cross the bridge to the museum.']],
     shown: -1
   };
   const tmpLook = new T.Vector3();
   function startCinematic() {
-    const w = G.world;
+    const w = G.world, sz = w.PAD.spawnZ;
+    cine.path = new T.CatmullRomCurve3([new T.Vector3(46, 34, sz + 110), new T.Vector3(24, 16, sz + 50), new T.Vector3(6, 5, sz + 14), new T.Vector3(0, EYE, sz)]);
+    cine.look = new T.CatmullRomCurve3([new T.Vector3(0, 0, w.PAD.cz), new T.Vector3(0, 1, w.PAD.cz - 4), new T.Vector3(0, 3, sz - 30), new T.Vector3(0, EYE + 0.4, sz - 14)]);
     w.doors.force = false; w.doors.open = 0;
     cine.t = 0; cine.shown = -1;
     $('cine').hidden = false; $('cine-caption').textContent = '';
@@ -6042,10 +6212,10 @@ CFT.loadModels = onProgress => {
   function endCinematic() {
     $('cine').hidden = true;
     G.world.doors.force = false;
-    placePlayer(0, 0, 54, 0, 0);
+    placePlayer(0, 0, G.world.PAD.spawnZ, 0, 0);
     G.setPhase('play');
     $('hud').hidden = false;
-    UI().toast('Walk inside', 'W A S D to move, mouse to look, Shift to walk faster. The doors open as you approach.');
+    UI().toast('Cross the bridge', 'W A S D to move, mouse to look, Shift to walk faster. Follow the bridge to the museum; the doors open as you approach.');
   }
   canvas.addEventListener('click', () => { if (G.phase === 'cinematic') endCinematic(); else if (G.phase === 'showcase') endShowcase(); });
   $('cine').addEventListener('click', () => { if (G.phase === 'cinematic') endCinematic(); else if (G.phase === 'showcase') endShowcase(); });
