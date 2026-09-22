@@ -702,6 +702,9 @@
 <script src="vendor/SimplexNoise.js"></script>
 <script src="vendor/SSAOShader.js"></script>
 <script src="vendor/SSAOPass.js"></script>
+<script src="vendor/Water.js"></script>
+<script src="vendor/BokehShader.js"></script>
+<script src="vendor/BokehPass.js"></script>
 <script>
 // CFT Kinetic — exhibit content and on-screen copy.
 // Edit this file to change installation text, specs, credits and route order.
@@ -2838,8 +2841,15 @@ CFT.loadModels = onProgress => {
     scene.fog = new T.Fog(0xAFCADC, 160, 1500);
     const hemi = new T.HemisphereLight(0xE4F0F7, 0x3A4A50, 0.55); scene.add(hemi);
     const sun = new T.DirectionalLight(0xFFF6EA, 0.9);
-    sun.position.set(-60, 110, 80); scene.add(sun);
-    return { hemi, sun };
+    sun.position.set(-60, 110, 80); scene.add(sun, sun.target);
+    // Key light shadows: a 60 m soft shadow box that follows the visitor (world.update moves it).
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(sun.shadow.camera, { left: -32, right: 32, top: 32, bottom: -32, near: 1, far: 320 });
+    sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.04; sun.shadow.radius = 3;
+    // Rim light: a cool back light opposite the sun that picks out edges and silhouettes.
+    const rim = new T.DirectionalLight(0x9CC4FF, 0.35); rim.position.set(60, 40, -80); scene.add(rim);
+    return { hemi, sun, rim };
   }
   // Night sky (the user's top-down night plan): deep navy overhead fading to a faint teal glow at the horizon,
   // stars, a soft moon, and a dark sea below.
@@ -3770,6 +3780,43 @@ CFT.loadModels = onProgress => {
       p.position.set(xm, 19.2, z1 + 0.04); scene.add(p);
       world.colliders.push({ x0, x1, z0, z1 });
     };
+    // Weathering: dirt streaks running down from ledges and a darker band at the foot, as an alpha decal.
+    const grime = (() => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 1024; const g = c.getContext('2d');
+      for (let i = 0; i < 90; i++) {
+        const x = Geo.hash(i, 1, 131) * 256, y = Geo.hash(i, 2, 131) * 900, w = 2 + Geo.hash(i, 3, 131) * 10, h = 60 + Geo.hash(i, 4, 131) * 380;
+        const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, `rgba(10,8,6,${0.18 + Geo.hash(i, 5, 131) * 0.3})`); gr.addColorStop(1, 'rgba(10,8,6,0)');
+        g.fillStyle = gr; g.fillRect(x, y, w, h);
+      }
+      const foot = g.createLinearGradient(0, 1024, 0, 820); foot.addColorStop(0, 'rgba(8,7,5,0.6)'); foot.addColorStop(1, 'rgba(8,7,5,0)'); g.fillStyle = foot; g.fillRect(0, 820, 256, 204);
+      return new T.CanvasTexture(c);
+    })();
+    const grimeM = new T.MeshBasicMaterial({ map: grime, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
+    const decal = (w, h, x, y, z, ry) => { const m = new T.Mesh(new T.PlaneGeometry(w, h), grimeM); m.position.set(x, y, z); m.rotation.y = ry || 0; m.renderOrder = 2; scene.add(m); };
+    [[13, 18], [-18, -13]].forEach(([x0, x1]) => { decal(5, 26, (x0 + x1) / 2, 13, 39.52); decal(7.3, 26, x0 - 0.02, 13, 35.85, -Math.PI / 2); decal(7.3, 26, x1 + 0.02, 13, 35.85, Math.PI / 2); });
+    [-9.2, 9.2].forEach(x => decal(1.6, 22, x, 19.2, 34.82));
+    decal(8, 1.2, 0, 8.7, cz + 1.12);
+    // Wet patches on the plaza: dark mirror-smooth puddles that reflect the sky.
+    const puddleA = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+      for (let i = 0; i < 7; i++) { const x = 30 + Geo.hash(i, 1, 137) * 68, y = 30 + Geo.hash(i, 2, 137) * 68, r = 18 + Geo.hash(i, 3, 137) * 26, gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); }
+      return new T.CanvasTexture(c);
+    })();
+    const puddleM = new T.MeshStandardMaterial({ color: 0x0C0E10, roughness: 0.02, metalness: 0.1, alphaMap: puddleA, transparent: true, depthWrite: false, envMapIntensity: 1.6 });
+    world.outdoor.push(puddleM);
+    for (let i = 0; i < 26; i++) {
+      const x = (Geo.hash(i, 4, 137) - 0.5) * 44, z = 47 + Geo.hash(i, 5, 137) * 36, s2 = 1.6 + Geo.hash(i, 6, 137) * 3.4;
+      const p = new T.Mesh(new T.PlaneGeometry(s2, s2 * (0.6 + Geo.hash(i, 7, 137) * 0.5)), puddleM); p.rotation.set(-Math.PI / 2, 0, Geo.hash(i, 8, 137) * 3); p.position.set(x, 0.01, z); p.renderOrder = 1; scene.add(p);
+    }
+    // Service cabinets at the foot of each tower, with conduit running up into the wall.
+    const cabM = new T.MeshStandardMaterial({ color: 0x3A3D42, roughness: 0.5, metalness: 0.6 });
+    [[15.5, 39.9], [-15.5, 39.9]].forEach(([x, z]) => {
+      A.add(Geo.roundedBox(1.4, 1.8, 0.6, 0.05), cabM, x, 0.9, z + 0.3);
+      A.box(amber, 0.3, 0.04, 0.02, x - 0.4, 1.5, z + 0.61);
+      [-0.45, 0.45].forEach(o => A.add(new T.CylinderGeometry(0.05, 0.05, 6, 8), dark, x + o, 4.8, z + 0.08));
+      world.colliders.push({ x, z: z + 0.3, r: 0.9 });
+    });
     tower(1, ['A', 'BRIGHTER', 'TOMORROW', 'IN MOTION']);
     tower(-1, ['A', 'HUMAN', 'TECHNOLOGY', 'NATURE', 'IN SYNC']);
     [-9.2, 9.2].forEach(x => {
@@ -3958,6 +4005,25 @@ CFT.loadModels = onProgress => {
     const waterM = new T.MeshStandardMaterial({ color: 0x05243A, roughness: 0.14, metalness: 0.5, normalMap: TX.water, normalScale: new T.Vector2(0.35, 0.35), envMapIntensity: 0.6 });
     const water = new T.Mesh(new T.PlaneGeometry(2600, 2600), waterM); water.rotation.x = -Math.PI / 2; water.position.set(cx, SEA.water, cz);
     scene.add(water); world.water = water;
+    if (T.Water) {
+      const wn = TX.water.clone(); wn.needsUpdate = true; wn.wrapS = wn.wrapT = T.RepeatWrapping; wn.repeat.set(1, 1);
+      const hq = new T.Water(new T.PlaneGeometry(2600, 2600), {
+        textureWidth: 1024, textureHeight: 1024, waterNormals: wn, sunDirection: new T.Vector3(-0.4, 0.7, 0.5).normalize(),
+        sunColor: 0xFFFFFF, waterColor: 0x0A3A52, distortionScale: 1.4, fog: true
+      });
+      hq.material.uniforms.size.value = 9;   // small, fine ripples
+      hq.rotation.x = -Math.PI / 2; hq.position.set(cx, SEA.water + 0.01, cz); hq.visible = false; scene.add(hq);
+      world.waterHQ = hq;
+    }
+    // 09 Atmosphere: a band of sea mist round the horizon, soft at top and bottom, tinted by the sky.
+    const mistTex = (() => {
+      const c = document.createElement('canvas'); c.width = 8; c.height = 256; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
+      gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.55, 'rgba(255,255,255,0.35)'); gr.addColorStop(0.85, 'rgba(255,255,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 8, 256); return new T.CanvasTexture(c);
+    })();
+    const mist = new T.Mesh(new T.CylinderGeometry(420, 420, 60, 96, 1, true),
+      new T.MeshBasicMaterial({ map: mistTex, color: 0xE0A07A, transparent: true, depthWrite: false, side: T.BackSide, fog: false }));
+    mist.position.set(cx, SEA.water + 22, cz); mist.renderOrder = -1; scene.add(mist); world.mist = mist;
     // Glowing buoys, each tethered to the nearest deck corner, bobbing on the swell.
     const buoyM = new T.MeshStandardMaterial({ color: 0x2A3136, roughness: 0.5, metalness: 0.4 });
     const lampM = new T.MeshBasicMaterial({ color: 0x9FFFF0, toneMapped: false });
@@ -4158,11 +4224,14 @@ CFT.loadModels = onProgress => {
         roomSign(scene, r, r.exhibit.index + 1, r.exhibit.data.name, r.exhibit.data.accent);
         buildExhibitRoom(A, M, D, scene, world, r, r.exhibit);
       });
-      A.build(scene);
+      shadowed(A.build(scene));
       buildDecals(scene, TX, D);
       world.buildExhibits = () => {};   // once only
     };
 
+    function shadowed(meshes) {
+      meshes.forEach(m => { const mt = m.material; if (mt.isMeshBasicMaterial || mt.transparent) return; m.castShadow = m.receiveShadow = true; });
+    }
     // Everything from here on draws without a single model, so it runs straight away.
     const hasExhibit = r => CFT.EXHIBITS.some(d => d.id === r.id);
     ROOMS.forEach(r => {
@@ -4175,7 +4244,7 @@ CFT.loadModels = onProgress => {
     buildEntranceAndExterior(A, M, D, scene, world);
     buildGrandFacade(A, M, D, scene, world, TX);
     buildSea(A, M, D, scene, world, TX);
-    A.build(scene);
+    shadowed(A.build(scene));
     buildDecals(scene, TX, D);
     buildBeacon(scene, world);
 
@@ -4243,6 +4312,7 @@ CFT.loadModels = onProgress => {
       // Sunset: a low golden sun behind the station (the façade is lit by its own amber lights), warm haze, dark
       // sea, and the deck lamps on.
       sun.position.copy(sunDay);
+      const rim = world.env.rim; rim.intensity = on ? 0.18 : 0.35; rim.color.setHex(on ? 0x6E8CC8 : 0x9CC4FF);
       if (sunset) {
         hemi.intensity = 0.42; hemi.color.setHex(0xFFC9A6); hemi.groundColor.setHex(0x1E1A24);
         sun.intensity = 1.25; sun.color.setHex(0xFFA861); sun.position.set(-110, 38, -150);
@@ -4251,7 +4321,18 @@ CFT.loadModels = onProgress => {
         if (world.bandM) world.bandM.emissiveIntensity = 1.1;
         (world.outdoor || []).forEach(m => { const d = m.userData.day; m.envMapIntensity = d.env * 0.4; m.color.setHex(d.col); m.color.multiplyScalar(0.55); });
         if (world.nightPools) world.nightPools.visible = true;
+        rim.intensity = 0.45; rim.color.setHex(0x8FA8FF);
       }
+      world.sunDir = sun.position.clone().normalize();
+      // The reflective sea follows the sky: sun glint colour and direction, and the deep water colour.
+      if (world.waterHQ) {
+        const u = world.waterHQ.material.uniforms;
+        u.sunDirection.value.copy(world.sunDir);
+        u.sunColor.value.setHex(on ? 0x3A4A6A : sunset ? 0xFFB070 : 0xFFFFFF);
+        u.waterColor.value.setHex(on ? 0x010810 : sunset ? 0x06202C : 0x0A3A52);
+        u.distortionScale.value = on ? 1.0 : 1.4;
+      }
+      if (world.mist) world.mist.material.color.setHex(on ? 0x0B1624 : sunset ? 0xE0A07A : 0xCFE0EA);
       const pool = world.nightPools && world.nightPools.children[0];
       if (pool) pool.material.opacity = sunset ? 0.28 : 0.55;
     };
@@ -4259,6 +4340,11 @@ CFT.loadModels = onProgress => {
     world.setQuality = function (q) {
       world.quality = q;
       shadowLight.castShadow = q !== 'low';
+      world.env.sun.castShadow = q !== 'low';
+      world.env.sun.shadow.mapSize.setScalar(q === 'high' ? 2048 : 1024);
+      if (world.env.sun.shadow.map) { world.env.sun.shadow.map.dispose(); world.env.sun.shadow.map = null; }
+      // 11 Water: the planar-reflection sea on High, the lighter normal-mapped sea otherwise.
+      if (world.waterHQ) { world.waterHQ.visible = q === 'high'; world.water.visible = q !== 'high'; }
       if (world.reflector) world.reflector.visible = q === 'high';
       world.floorMats.forEach(m => { m.transparent = q === 'high' && !!world.reflector; m.opacity = m.transparent ? 0.8 : 1; m.needsUpdate = true; });
       world.lightCount = q === 'high' ? 8 : q === 'medium' ? 6 : 4;
@@ -4344,6 +4430,11 @@ CFT.loadModels = onProgress => {
 
     const order = [];
     world.update = function (dt, eye, camera) {
+      // The key light's shadow box travels with the visitor, snapped to whole texels so shadow edges do not shimmer.
+      { const sun = world.env.sun, dir = world.sunDir || (world.sunDir = sun.position.clone().normalize()), k = 64 / 2048;
+        const cx = Math.round(eye.x / k) * k, cz = Math.round(eye.z / k) * k;
+        sun.target.position.set(cx, 0, cz); sun.position.set(cx + dir.x * 150, dir.y * 150, cz + dir.z * 150); }
+      if (world.waterHQ && world.waterHQ.visible) world.waterHQ.material.uniforms.time.value += dt * 0.6;
       const d = world.doors;
       const near = Math.abs(eye.x) < 9 && Math.abs(eye.z - DOOR_Z) < 7.5;
       d.target = d.force || near ? 1 : 0;
@@ -5892,10 +5983,33 @@ CFT.loadModels = onProgress => {
         ssao.kernelRadius = 0.35; ssao.minDistance = 0.0008; ssao.maxDistance = 0.03;
         c.addPass(ssao);
       }
+      // Depth of field for the cinematic moments (opening film, product films, title), off while walking.
+      let dof = null;
+      if (T.BokehPass) {
+        dof = new T.BokehPass(scene, camera, { focus: 20, aperture: 0.0025, maxblur: 0.006, width: window.innerWidth, height: window.innerHeight });
+        dof.enabled = false; c.addPass(dof);
+      }
       const bloom = new T.UnrealBloomPass(new T.Vector2(window.innerWidth, window.innerHeight), 0.45, 0.4, 0.93);
       c.addPass(bloom);
       c.addPass(new T.ShaderPass(T.GammaCorrectionShader));
-      return { c, bloom, ssao };
+      // Colour grading in display space: contrast, saturation, a colour balance per sky, a soft vignette and fine grain.
+      const grade = new T.ShaderPass({
+        uniforms: { tDiffuse: { value: null }, contrast: { value: 1.06 }, saturation: { value: 1.06 }, balance: { value: new T.Vector3(1, 1, 1) }, vignette: { value: 0.28 }, grain: { value: 0.02 }, time: { value: 0 } },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: `uniform sampler2D tDiffuse; uniform float contrast, saturation, vignette, grain, time; uniform vec3 balance; varying vec2 vUv;
+          float rnd(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+          void main() {
+            vec3 c = texture2D(tDiffuse, vUv).rgb * balance;
+            float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+            c = mix(vec3(l), c, saturation);
+            c = (c - 0.5) * contrast + 0.5;
+            vec2 d = vUv - 0.5; c *= 1.0 - vignette * smoothstep(0.25, 0.8, dot(d, d) * 2.2);
+            c += (rnd(vUv * 1000.0 + time) - 0.5) * grain;
+            gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+          }`
+      });
+      c.addPass(grade);
+      return { c, bloom, ssao, dof, grade };
     } catch (e) { return null; }
   }
   function applyQuality(q) {
@@ -6722,7 +6836,21 @@ CFT.loadModels = onProgress => {
     const night = !!(G.world && G.world.night);
     const sunset = !!(G.world && G.world.sunset);
     renderer.toneMappingExposure = night ? 1.0 : sunset ? 0.9 : 0.82;
-    if (post) post.bloom.strength = night ? 0.8 : sunset ? 0.7 : 0.45;
+    if (post) {
+      post.bloom.strength = night ? 0.8 : sunset ? 0.7 : 0.45;
+      const u = post.grade.uniforms;
+      u.time.value = now * 0.001 % 100;
+      u.balance.value.set(...(night ? [0.94, 0.98, 1.08] : sunset ? [1.06, 1.0, 0.92] : [1.0, 1.0, 1.0]));
+      u.contrast.value = night ? 1.1 : sunset ? 1.09 : 1.05; u.saturation.value = night ? 0.95 : sunset ? 1.1 : 1.05;
+      if (post.dof) {
+        const cine = G.phase === 'cinematic' || G.phase === 'showcase' || G.phase === 'title';
+        post.dof.enabled = cine && G.state.settings.quality === 'high';
+        if (cine) {
+          const fx = G.phase === 'showcase' && show.ex ? camera.position.distanceTo(show.ex.pos) : G.phase === 'title' ? 22 : 16;
+          post.dof.uniforms.focus.value += (fx - post.dof.uniforms.focus.value) * 0.1;
+        }
+      }
+    }
     if (G.usePost) post.c.render(dt); else renderer.render(scene, camera);
     // Step graphics down while the frame rate stays low: on the title and intro too, so a slower machine does not sit
     // on a frozen-looking screen. A single long frame counts as at most one second.
