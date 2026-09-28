@@ -514,7 +514,7 @@
   </div>
   <div class="title-foot">
     <div class="title-controls">
-      <p class="specline"><b>27</b> projects · <b>2</b> atrium gallery floors · <b>14</b> downstairs · <b>13</b> upstairs</p>
+      <p class="specline"><b>27</b> projects · <b>3</b> gallery tiers · central <b>DNA</b> installation</p>
       <p class="specline byline">Game design &amp; build by <b>CFT 3D Team</b></p>
       <div class="eyebrow">Controls</div><div id="controls-title"></div>
       <p class="title-note">Best with a keyboard and mouse. Sound and narration are on — adjust them from the pause menu.</p></div>
@@ -590,7 +590,7 @@
 
 <div id="map" class="overlay modal" hidden role="dialog" aria-labelledby="map-title">
   <div class="sheet map-sheet">
-    <div class="sheet-head"><div><div class="eyebrow">Atrium plan · Select a floor</div><h2 id="map-title">Map</h2></div><div class="sheet-nav"><label>Floor <select id="map-level"><option value="0">Ground gallery</option><option value="1">Upper gallery</option></select></label><button class="close-btn" id="map-lobby">Lobby</button><button class="close-btn" data-home>&#8962; Home</button><button class="close-btn" id="map-close">&#8592; Back &middot; M</button></div></div>
+    <div class="sheet-head"><div><div class="eyebrow">Atrium plan · Select a floor</div><h2 id="map-title">Map</h2></div><div class="sheet-nav"><label>Floor <select id="map-level"><option value="0">Ground gallery</option><option value="1">Middle gallery</option><option value="2">Upper gallery</option></select></label><button class="close-btn" id="map-lobby">Lobby</button><button class="close-btn" data-home>&#8962; Home</button><button class="close-btn" id="map-close">&#8592; Back &middot; M</button></div></div>
     <canvas id="map-canvas" aria-label="Floor plan of the building. Click a hall to jump there."></canvas>
     <aside class="map-aside">
       <figure class="map-drawing" id="map-drawing" hidden><img alt=""><figcaption></figcaption></figure>
@@ -4299,7 +4299,7 @@ CFT.loadModels = onProgress => {
       // The stage follows the installation's footprint (as on its line drawing): long installations stand on a
       // rectangular stage, compact ones on a round plinth. Measurement lines on the floor give the drawing's sizes.
       ex.sourceSize = Object.assign({},ex.size);
-      const fit = Math.min(1,2.4/ex.size.w,2.4/ex.size.d,2.65/ex.size.h,1.25/ex.radius);
+      const fit = r.central ? Math.min(3,3.8/ex.size.w,3.8/ex.size.d,7.8/ex.size.h,1.8/ex.radius) : Math.min(1,2.4/ex.size.w,2.4/ex.size.d,2.65/ex.size.h,1.25/ex.radius);
       const modelGroup=ex.group; modelGroup.scale.multiplyScalar(fit);
       ex.group=new T.Group();ex.group.add(modelGroup);
       ex.size={w:ex.size.w*fit,h:ex.size.h*fit,d:ex.size.d*fit};ex.radius*=fit;ex.displayScale=fit;
@@ -4336,13 +4336,23 @@ CFT.loadModels = onProgress => {
       ROOMS.forEach(r => {
         if (!r.exhibit) return;
         const ex=r.exhibit;
-        const tx=canvasTexture(1024,192,(c,w,h)=>{
-          c.fillStyle='#101E28';c.fillRect(0,0,w,h);c.fillStyle=ex.data.accent;
-          c.font=`28px ${FONT.mono}`;c.fillText(`${ex.hall} / ${ex.data.floorName.toUpperCase()}`,35,50);
-          c.fillStyle='#FFFFFF';fitFont(c,ex.data.name,FONT.display,54,950);c.fillText(ex.data.name,35,130);
-        });
-        const panel=sign(3.2,0.6,tx,true);panel.position.set(r.cx-r.f[0]*1.55,FLOOR+r.elevation+3.05,r.cz-r.f[1]*1.55);
-        panel.rotation.y=Math.atan2(r.f[0],r.f[1]);scene.add(panel);
+        if(r.central) {
+          const tx=canvasTexture(512,256,(c,w,h)=>{c.fillStyle='#08111A';c.fillRect(0,0,w,h);c.fillStyle='#FFD37C';c.font=`100px ${FONT.display}`;c.fillText('01',40,110);c.fillStyle='#FFFFFF';c.font=`65px ${FONT.display}`;c.fillText('DNA',40,205);});
+          const label=sign(2.2,1.1,tx,true);label.position.set(0,ex.pos.y+ex.size.h+0.8,0.8);scene.add(label);
+        } else {
+          const bay=new T.Group();bay.position.copy(ex.pos);bay.rotation.y=Math.atan2(r.f[0],r.f[1]);
+          const black=new T.MeshBasicMaterial({color:0x07111B});
+          const trim=new T.MeshBasicMaterial({color:0xFFD090,toneMapped:false});
+          const wall=new T.Mesh(Geo.roundedBox(4.5,4.1,0.18,0.07),black);wall.position.set(0,2.05,-1.72);bay.add(wall);
+          [-2.15,2.15].forEach(x=>{const strip=new T.Mesh(new T.BoxGeometry(0.035,3.9,0.06),trim);strip.position.set(x,2.05,-1.58);bay.add(strip);});
+          const top=new T.Mesh(new T.BoxGeometry(4.3,0.035,0.06),trim);top.position.set(0,4.02,-1.58);bay.add(top);
+          const tx=canvasTexture(1024,320,(c,w,h)=>{
+            c.fillStyle='#07111B';c.fillRect(0,0,w,h);c.fillStyle='#FFD078';c.font=`bold 118px ${FONT.display}`;c.fillText(pad2(ex.index+1),35,130);
+            c.fillStyle='#FFFFFF';fitFont(c,ex.data.name,FONT.display,55,950);c.fillText(ex.data.name,35,232);
+            c.fillStyle='#B0C7DA';c.font=`25px ${FONT.mono}`;c.fillText(ex.data.floorName.toUpperCase(),35,292);
+          });
+          const panel=sign(3.6,1.12,tx,true);panel.position.set(0,3.25,-1.6);bay.add(panel);scene.add(bay);
+        }
         world.anchors.push({pos:V(r.cx,FLOOR+r.elevation+3.1,r.cz),color:new T.Color(ex.data.accent),base:0.35,range:5});
       });
       shadowed(A.build(scene));
@@ -4475,7 +4485,7 @@ CFT.loadModels = onProgress => {
     // ------------------------------------------------ Collision: returns floor height, or null if blocked
     function collide(x, z, y = FLOOR) {
       for (const c of world.colliders) {
-        if(c.level!==undefined && c.level!==(y>FLOOR+3.8?1:0))continue;
+        if(c.level!==undefined && c.level!==CFT.floorLevel(y,FLOOR))continue;
         if (c.r !== undefined) { if ((x - c.x) * (x - c.x) + (z - c.z) * (z - c.z) < (c.r + PR) * (c.r + PR)) return true; }
         else if (x > c.x0 - PR && x < c.x1 + PR && z > c.z0 - PR && z < c.z1 + PR) return true;
       }
@@ -4505,12 +4515,12 @@ CFT.loadModels = onProgress => {
     world.zoneAt = function (x, z, y = FLOOR) {
       const inside = (x > BLD.x0 && x < BLD.x1 && z > BLD.z0 && z < BLD.z1) || (x > -5 && x < 5 && z >= BLD.z1 && z <= PAV.z1);
       if (inside) {
-        const r = ROOMS.find(rr => rr.level===(y>FLOOR+3.8?1:0) && x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
+        const r = ROOMS.find(rr => rr.level===CFT.floorLevel(y,FLOOR) && x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
         if (r && r.exhibit) return { id: 'hall', name: `${r.exhibit.hall} · ${r.exhibit.data.name}`, exhibit: r.exhibit };
         if (r && r.type === 'cafe') return { id: 'cafe', name: 'Café', room: r };
         if (z > BLD.z1) return { id: 'entrance', name: 'Main Entrance' };
         if (z > HALL.z1) return { id: 'entrance', name: 'Entrance Hall' };
-        if (Math.hypot(x, z) < LOBBY_R) return { id: 'lobby', name: 'Central Lobby' };
+        if (Math.abs(x)<21 && Math.abs(z)<21) return { id: 'lobby', name: 'CFT Atrium' };
         return { id: 'promenade', name: 'Exhibition Promenade' };
       }
       if (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < PORCH.z1) return { id: 'plaza', name: 'Entrance Porch' };
@@ -4562,7 +4572,7 @@ CFT.loadModels = onProgress => {
       return r ? r.exhibit.index : -1;
     };
     world.teleportPoint = function (ex) {
-      const d = ex.room.face==='+z' ? 1.8 : 2.2;
+      const d = ex.room.central ? 3.2 : ex.room.face==='+z' ? 1.8 : 2.2;
       return { x: ex.pos.x + ex.front.x * d, z: ex.pos.z + ex.front.z * d, yaw: Math.atan2(ex.front.x, ex.front.z) };
     };
 
@@ -5095,10 +5105,10 @@ CFT.loadModels = onProgress => {
   }
   function openMap() {
     mapState.active = true; mapState.hover = -1;
-    mapState.level=G().player.pos.y>G().world.FLOOR+3.8?1:0;
+    mapState.level=CFT.floorLevel(G().player.pos.y,G().world.FLOOR);
     $('map-level').value=String(mapState.level);
     $('map-level').onchange=()=>{mapState.level=+$('map-level').value;drawMapNow();};
-    $('map-list').innerHTML = [0,1].map(level => '<li class="list-label">'+(level?'Upper gallery · 15–27':'Ground gallery · 01–14')+'</li>'+CFT.EXHIBITS.filter(e=>e.floorLevel===level).map(e=>hallRow(e.id)).join('')).join('');
+    $('map-list').innerHTML = [0,1,2].map(level => '<li class="list-label">'+CFT.FLOOR_NAMES[level]+'</li>'+CFT.EXHIBITS.filter(e=>e.floorLevel===level).map(e=>hallRow(e.id)).join('')).join('');
     $('map-list').querySelectorAll('.hall-row').forEach(b => {
       b.onclick = () => jump(+b.dataset.i);
       b.onmouseenter = () => { mapState.hover = +b.dataset.i; mapPreview(mapState.hover); };
@@ -5152,7 +5162,7 @@ CFT.loadModels = onProgress => {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.fillStyle = '#030A10'; c.fillRect(0, 0, w, h);
     CFT.drawMap(c, w, h, {
-      world: g.world, level:g.player.pos.y>g.world.FLOOR+3.8?1:0, compact: true, dark: true, visited: g.state.progress.visited,
+      world: g.world, level:CFT.floorLevel(g.player.pos.y,g.world.FLOOR), compact: true, dark: true, visited: g.state.progress.visited,
       player: { x: g.player.pos.x, z: g.player.pos.z, yaw: g.player.yaw },
       route: g.guided() ? g.routePoints() : null
     });
@@ -6393,7 +6403,7 @@ CFT.loadModels = onProgress => {
     return function update(dt) {
       if (G.phase !== 'play' || !G.world) { mesh.count = 0; return; }
       // The first time a visitor walks up to the lobby globe, the Craftech360 showreel opens.
-      if (!P().showreelSeen && Math.hypot(G.player.pos.x, G.player.pos.z) < 7.4) {
+      if (!P().showreelSeen && G.player.pos.y<G.world.FLOOR+1 && Math.hypot(G.player.pos.x, G.player.pos.z) < 7.4) {
         P().showreelSeen = true; G.save(); UI().openShowreel(); return;
       }
       const bd = G.pendingBoard();
@@ -6653,7 +6663,7 @@ CFT.loadModels = onProgress => {
     placePlayer(t.x, ex.pos.y, t.z, t.yaw, 0.12);
     if (viaMap) { G.award('wayfinder'); UI().toast(`Arrived at ${ex.data.name}`, ex.data.pendingModel ? 'Press E for project details and available drawings.' : 'Press E to bring it to life.'); }
   };
-  G.returnToLobby = function () { placePlayer(0, G.world.FLOOR, 11.5, 0, 0.23); };
+  G.returnToLobby = function () { placePlayer(0, G.world.FLOOR, 16.5, 0, 0.22); };
 
   // ---------------------------------------------------------------- Interaction
   const fwd = new T.Vector3();
@@ -6670,7 +6680,9 @@ CFT.loadModels = onProgress => {
     });
     G.world.kiosks.forEach(k => {
       const dx = k.pos.x - p.x, dz = k.pos.z - p.z, d = Math.hypot(dx, dz);
-      if (d > k.radius || (dx * fwd.x + dz * fwd.z) / (d || 1) < 0.35) return;
+      if (k.id === 'map' && p.y > G.world.FLOOR + 1) return;
+      const needsFacing = k.id !== 'map' || d > 2;
+      if (d > k.radius || (needsFacing && (dx * fwd.x + dz * fwd.z) / (d || 1) < 0.35)) return;
       if (d - 1 < bestScore) { bestScore = d - 1; best = { type: 'kiosk', k }; }
     });
     return best;
@@ -6681,6 +6693,7 @@ CFT.loadModels = onProgress => {
     if (!f) return;
     if (f.type === 'kiosk') {
       if (f.k.id === 'desk') UI().openRoute();
+      else if (f.k.id === 'map') UI().openMap();
       else if (f.k.id === 'info') UI().openMuseumInfo();
       else if (f.k.id === 'company') UI().openCompany();
       else UI().openMap();
@@ -6738,7 +6751,7 @@ CFT.loadModels = onProgress => {
       const here = z.exhibit === ex;
       ex.here = here;
       ex.forceVisible = panelEx === ex;
-      ex.target = ((ex.activated && here) || panelEx === ex) ? 1 : (here ? 0.18 : 0.12);
+      ex.target = ((ex.activated && here) || panelEx === ex) ? 1 : (here ? 0.55 : 0.4);
       if (ex.energy > 0.85 && (here || panelEx === ex)) {
         ex.activeTime += dt;
         if (!ex.data.pendingModel && ex.activeTime > 8 && !pr.watched[ex.index]) { pr.watched[ex.index] = true; G.save(); }
@@ -6813,7 +6826,7 @@ CFT.loadModels = onProgress => {
     t: 0, dur: 11,
     path: new T.CatmullRomCurve3([new T.Vector3(28, 16, 112), new T.Vector3(13, 7, 84), new T.Vector3(3, 2.6, 62), new T.Vector3(0, EYE, 54)]),
     look: new T.CatmullRomCurve3([new T.Vector3(0, 6, 41), new T.Vector3(0, 4.8, 41), new T.Vector3(0, 3.4, 40), new T.Vector3(0, EYE + 0.4, 40)]),
-    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Twenty-seven projects. Two gallery floors. One kinetic atrium.'], [7.4, 'The doors are opening. Welcome in.']],
+    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Twenty-seven projects. Three gallery tiers. One kinetic museum.'], [7.4, 'The doors are opening. Welcome in.']],
     shown: -1
   };
   const tmpLook = new T.Vector3();

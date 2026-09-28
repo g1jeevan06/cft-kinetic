@@ -1,23 +1,25 @@
-// The entire collection is displayed in the atrium, split across two levels.
+// Numbering and tier placement follow the supplied museum reference.
 (function(){
   CFT.ATRIUM_SCALE=1.6;
-  const spots=[];
-  for(const level of [0,1]) {
-    for(const side of [-1,1]) for(const z of [-16,-9,-2,5,12]) spots.push({x:side*17,z,face:side<0?'+x':'-x',level});
-    for(const x of level?[-8,0,8]:[-12,-4,4,12]) spots.push({x,z:-18.3,face:'+z',level});
-  }
-  CFT.LAYOUT.rooms=CFT.EXHIBITS.map((e,i)=>{
-    const p=spots[i];e.floorLevel=p.level;e.floorName=p.level?'Upper Gallery':'Ground Gallery';e.wing=p.face==='+z'?'North':p.x<0?'West':'East';
-    return {id:e.id,x0:p.x-2.5,x1:p.x+2.5,z0:p.z-2.8,z1:p.z+2.8,face:p.face,level:p.level,elevation:p.level*4.4,openGallery:true};
+  CFT.floorLevel=(y,floor=0.75)=>Math.max(0,Math.min(2,Math.floor((y-floor+0.38)/4.4)));
+  CFT.FLOOR_NAMES=['Ground Gallery','Middle Gallery','Upper Gallery'];
+  const tiers=[[2,3,4,5,23,24,25,26,27],[15,16,17,18,19,20,21,22],[6,7,8,9,10,11,12,13,14]],spots={};
+  tiers.forEach((numbers,level)=>{
+    numbers.slice(0,4).forEach((n,i)=>spots[n]={x:-17,z:12-i*8,face:'+x',level});
+    numbers.slice(4).forEach((n,i)=>spots[n]={x:17,z:12-i*7,face:'-x',level});
   });
-  CFT.MUSEUM_INFO.layout='All 27 projects are displayed around the central atrium: 14 on the ground floor and 13 on the upper gallery, linked by the twin staircases.';
-  CFT.MUSEUM_INFO.dimensions=CFT.MUSEUM_INFO.dimensions.map(row=>row[0]==='Central lobby'?['Central atrium','42 m square, two gallery floors']:row[0]==='Project halls'?['Project displays','14 ground floor / 13 upper gallery']:row);
-  CFT.NARRATION.welcome='Welcome to the Kinetic Atrium. Explore fourteen projects on the ground floor, then take either staircase to the thirteen upper-gallery displays.';
+  spots[1]={x:0,z:0,face:'+z',level:1,central:true};
+  CFT.LAYOUT.rooms=CFT.EXHIBITS.map((e,i)=>{
+    const p=spots[i+1];e.floorLevel=p.level;e.floorName=CFT.FLOOR_NAMES[p.level];e.wing=p.central?'North':p.x<0?'West':'East';
+    return {id:e.id,x0:p.x-(p.central?5:2.5),x1:p.x+(p.central?5:2.5),z0:p.z-(p.central?5:2.8),z1:p.z+(p.central?5:2.8),face:p.face,level:p.level,elevation:p.level*4.4,central:!!p.central,openGallery:true};
+  });
+  CFT.MUSEUM_INFO.layout='Three tiers surround central DNA and reception. Ground: 02–05 and 23–27. Middle: 15–22 plus central 01. Upper: 06–14. Twin stair flights connect the levels.';
+  CFT.MUSEUM_INFO.dimensions=CFT.MUSEUM_INFO.dimensions.map(row=>row[0]==='Central lobby'?['Central atrium','42 m square, three gallery tiers']:row[0]==='Project halls'?['Project displays','27 across three tiers']:row);
+  CFT.NARRATION.welcome='Welcome to CFT Kinetic Museum. Explore three gallery levels around the central DNA installation. Use the stairs or choose a project from the floor map.';
   CFT.galleryRoute=function(from,to,world){
-    const ground=world.FLOOR,upper=ground+4.4;
-    const level=p=>p.y>ground+3.8?1:0;
+    const ground=world.FLOOR,level=p=>CFT.floorLevel(p.y,ground);
     const segment=(a,b,l)=>{
-      const y=l?upper:ground;
+      const y=ground+l*4.4;
       const path=CFT.findWalkPath(a,b,(x,z)=>{
         const h=world.floorAt(x,z,y);
         return h!==null && Math.abs(h-y)<0.3?h:null;
@@ -27,9 +29,14 @@
     const a=level(from),b=level(to);
     if(a===b)return segment(from,to,a)||[];
     for(const side of [from.x<0?-1:1,from.x<0?1:-1]){
-      const low={x:side*11.2,z:14.7,y:ground},high={x:side*11.2,z:-0.8,y:upper};
-      const first=segment(from,a?high:low,a),last=segment(b?high:low,to,b);
-      if(first&&last)return [...first,a?low:high,...last.slice(1)];
+      const endpoints=[{x:side*11.2,z:14.7,y:ground},{x:side*11.2,z:0,y:ground+4.4},{x:side*11.2,z:-15.4,y:ground+8.8}];
+      let current=from,result=[],ok=true;
+      for(let l=a;l!==b;l+=Math.sign(b-a)){
+        const path=segment(current,endpoints[l],l);
+        if(!path){ok=false;break;}
+        result.push(...path);current=endpoints[l+Math.sign(b-a)];result.push(current);
+      }
+      if(ok){const last=segment(current,to,b);if(last)return [...result,...last.slice(1)];}
     }
     return [];
   };

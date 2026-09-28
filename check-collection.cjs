@@ -24,6 +24,12 @@ for(const x of [-7,7]) {
     assert.equal(typeof h,'number'); assert(y-h<=0.221); y=h;
   }
 }
+for(const x of [-7,7]){
+  let y=5.15;
+  for(let z=0;z>=-9.6;z-=0.05){const h=c.atriumHeight(x,z,y,0.75);assert.equal(typeof h,'number');assert(h-y<=0.221);y=h;}
+  assert(Math.abs(y-9.55)<0.001);
+  for(let z=-9.6;z<=0;z+=0.05){const h=c.atriumHeight(x,z,y,0.75);assert.equal(typeof h,'number');assert(y-h<=0.221);y=h;}
+}
 assert.equal(c.atriumHeight(10,-6,0.75,0.75),undefined,'walk beneath balcony');
 assert.equal(c.atriumHeight(10,-6,5.15,0.75),5.15,'walk on balcony');
 assert.equal(c.atriumHeight(5.5,-6,5.15,0.75),null,'inner railing blocks');
@@ -41,21 +47,22 @@ rooms.forEach((r,i) => {
   rooms.slice(i+1).filter(s=>s.level===r.level).forEach(s => assert(!(r.x0<s.x1 && r.x1>s.x0 && r.z0<s.z1 && r.z1>s.z0),'overlapping halls'));
   if(r.level){
     const x=(r.x0+r.x1)/2+(r.face==='+x'?2.2:r.face==='-x'?-2.2:0);
-    const z=(r.z0+r.z1)/2+(r.face==='+z'?1.8:0);
-    assert.equal(c.atriumHeight(x/1.6,z/1.6,5.15,0.75),5.15,'upper exhibit landing '+r.id);
+    const z=(r.z0+r.z1)/2+(r.central?3.2:r.face==='+z'?1.8:0),y=0.75+r.elevation;
+    assert.equal(c.atriumHeight(x/1.6,z/1.6,y,0.75),y,'upper exhibit landing '+r.id);
   }
 });
-assert.equal(rooms.filter(r=>r.level===0).length,14);
-assert.equal(rooms.filter(r=>r.level===1).length,13);
+for(const level of [0,1,2])assert.equal(rooms.filter(r=>r.level===level).length,9);
+assert(rooms[0].central);
+assert.equal(rooms[5].level,2);assert.equal(rooms[14].level,1);assert.equal(rooms[22].level,0);
 const galleryWorld={FLOOR:0.75,HALL:c.LAYOUT.promenade,floorAt(x,z,y=0.75){
   const h=c.atriumHeight(x/1.6,z/1.6,y,0.75);
   if(h===null)return null;
-  for(const r of rooms)if(r.level===(y>4.55?1:0)&&Math.hypot(x-(r.x0+r.x1)/2,z-(r.z0+r.z1)/2)<1.7)return null;
-  if(Math.hypot(x,z)<5.7)return null;
+  for(const r of rooms)if(r.level===c.floorLevel(y)&&Math.hypot(x-(r.x0+r.x1)/2,z-(r.z0+r.z1)/2)<(r.central?2:1.7))return null;
+  if(y<4.5&&Math.hypot(x,z)<5.7)return null;
   return h===undefined?0.75:h;
 }};
 for(const r of rooms.filter(r=>r.level)){
-  const to={x:(r.x0+r.x1)/2+(r.face==='+x'?2.2:r.face==='-x'?-2.2:0),z:(r.z0+r.z1)/2+(r.face==='+z'?1.8:0),y:5.15};
+  const to={x:(r.x0+r.x1)/2+(r.face==='+x'?2.2:r.face==='-x'?-2.2:0),z:(r.z0+r.z1)/2+(r.central?3.2:r.face==='+z'?1.8:0),y:0.75+r.elevation};
   assert(c.galleryRoute({x:0,z:20,y:0.75},to,galleryWorld).length>2,'stair route to '+r.id);
   assert(c.galleryRoute(to,{x:0,z:20,y:0.75},galleryWorld).length>2,'return route from '+r.id);
 }

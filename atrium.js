@@ -1,9 +1,9 @@
 // Reference-inspired double-height atrium. Dimensions are in metres.
 (function () {
   CFT.buildReferenceAtrium = function (A,M,D,scene,world,T,Geo,FLOOR,TOP,canvasTexture,sign,FONT,plant) {
-    const upper=FLOOR+4.4, roof=FLOOR+12.5;
-    const metal=new T.MeshStandardMaterial({color:0x26343D,roughness:0.34,metalness:0.7});
-    const stone=new T.MeshStandardMaterial({color:0xA9B4B9,roughness:0.35,metalness:0.2});
+    const upper=FLOOR+4.4, crown=FLOOR+8.8, roof=FLOOR+17;
+    const metal=new T.MeshStandardMaterial({color:0x101820,roughness:0.24,metalness:0.82});
+    const stone=new T.MeshStandardMaterial({color:0x344653,roughness:0.19,metalness:0.65});
     const dark=new T.MeshStandardMaterial({color:0x101E28,roughness:0.44,metalness:0.3});
     const glass=new T.MeshStandardMaterial({color:0x63B9DC,transparent:true,opacity:0.2,roughness:0.1,metalness:0.1,side:T.DoubleSide,depthWrite:false});
     const blue=new T.MeshBasicMaterial({color:0x49CFFF});
@@ -30,7 +30,7 @@
       box(warm,7.4,0.035,0.06,s*9.15,upper-0.22,0.04);
       rail(s*5.4,-9.8,s*5.4,0,upper);
       rail(s*12.85,-12.8,s*12.85,10,upper);
-      rail(s*5.4,0,s*5.75,0,upper);rail(s*8.25,0,s*8.65,0,upper);
+      box(stone,7.0,0.04,0.8,s*9.0,upper+0.02,0);
       // Twin broad staircases, twenty illuminated treads.
       for(let i=0;i<20;i++){
         const h=(i+1)*0.22,z=9-(i+0.5)*0.45;
@@ -64,6 +64,42 @@
     box(metal,10.8,0.3,3.2,0,upper-0.15,-11.4);
     box(stone,10.8,0.04,3.2,0,upper+0.02,-11.4);
     rail(-5.4,-9.8,5.4,-9.8,upper);rail(-12.85,-12.85,12.85,-12.85,upper);
+    // Third tier: stairwells remain open; the outer gallery stays continuous.
+    [-1,1].forEach(s=>{
+      box(metal,4.65,0.3,13,s*10.575,crown-0.15,-6.5);
+      box(stone,4.65,0.04,13,s*10.575,crown+0.02,-6.5);
+      box(metal,2.85,0.3,4,s*6.825,crown-0.15,-11);
+      box(stone,2.85,0.04,4,s*6.825,crown+0.02,-11);
+      box(metal,4.25,0.3,10,s*10.775,crown-0.15,5);
+      box(stone,4.25,0.04,10,s*10.775,crown+0.02,5);
+      rail(s*8.65,0,s*8.65,10,crown);rail(s*8.65,10,s*12.85,10,crown);
+      rail(s*8.25,-9,s*8.25,0,crown);rail(s*5.4,-12.8,s*5.4,-9,crown);
+      rail(s*12.85,-12.8,s*12.85,10,crown);
+      for(let i=0;i<20;i++){
+        const h=(i+1)*0.22,z=-0.4-(i+0.5)*0.45;
+        box(metal,2.5,h,0.45,s*7,upper+h/2,z);
+        box(stone,2.5,0.035,0.44,s*7,upper+h+0.018,z);
+        box(warm,2.3,0.025,0.035,s*7,upper+h,z+0.22);
+      }
+      [s*5.75,s*8.25].forEach(x=>{
+        for(let i=0;i<=10;i++)box(metal,0.06,1.1,0.06,x,upper+i*0.44+0.55,-i*0.9);
+        const line=new T.LineCurve3(new T.Vector3(x,upper+1.12,0),new T.Vector3(x,crown+1.12,-9));
+        A.add(new T.TubeGeometry(line,1,0.045,8),metal,0,0,0);
+      });
+      // Middle-tier bridge to the DNA podium, accessible from either stair landing.
+      box(metal,2.3,0.25,2.0,s*4.6,upper-0.125,0);
+      box(stone,2.3,0.025,2.0,s*4.6,upper+0.01,0);
+      rail(s*3.5,1,s*5.75,1,upper);rail(s*3.5,-1,s*5.75,-1,upper);
+      for(const y of [upper,crown]){
+        box(warm,0.07,0.045,22.5,s*8.6,y-0.12,-1.5);
+        box(metal,0.36,16.7,0.38,s*12.95,FLOOR+8.35,-5);
+        box(blue,0.045,3.0,0.04,s*12.7,y+1.8,-5);
+      }
+    });
+    box(metal,10.8,0.3,3.2,0,crown-0.15,-11.4);
+    box(stone,10.8,0.04,3.2,0,crown+0.02,-11.4);
+    rail(-5.4,-9.8,5.4,-9.8,crown);rail(-12.85,-12.85,12.85,-12.85,crown);
+    box(warm,25.6,0.05,0.08,0,crown-0.14,-9.8);
     // Roof: octagonal luminous coffers, a blue glass skylight and structural grid.
     [-10.8,10.8].forEach(v=>{
       box(metal,4.8,0.22,26.4,v,roof,0);
@@ -107,14 +143,59 @@
       box(blue,1.9,0.045,0.04,x,upper+0.45,-12.67);
       box(metal,2.3,0.12,0.16,x,upper+3.1,-12.7);
     }
-    // Low octagonal directory island keeps the architectural sightline open.
-    A.add(new T.CylinderGeometry(3.0,3.25,0.24,8),metal,0,FLOOR+0.12,0);
-    A.add(new T.CylinderGeometry(2.9,2.9,0.035,8),dark,0,FLOOR+0.255,0);
-    A.add(new T.TorusGeometry(2.9,0.035,6,8),blue,0,FLOOR+0.28,0,0,Math.PI/2);
-    box(metal,1.6,0.9,0.7,0,FLOOR+0.7,1.3);
-    box(blue,1.45,0.035,0.6,0,FLOOR+1.16,1.3);
-    world.colliders.push({x:0,z:0,r:3.3});
-    world.kiosks.push({id:'desk',label:'Atrium Directory',verb:'Choose your route',pos:new T.Vector3(0,FLOOR+1,1.3),radius:5.8});
+    // Reception below the raised DNA podium; gold light ribbons frame the real model.
+    A.add(new T.CylinderGeometry(3.45,3.45,0.28,64),metal,0,upper-0.14,0);
+    A.add(new T.TorusGeometry(3.42,0.045,8,100),warm,0,upper+0.025,0,0,Math.PI/2);
+    for(let i=0;i<32;i++){
+      const a=i/32*Math.PI*2,b=(i+1)/32*Math.PI*2;
+      if(Math.abs(Math.cos((a+b)/2))<0.35)continue;
+      rail(Math.sin(a)*3.35,Math.cos(a)*3.35,Math.sin(b)*3.35,Math.cos(b)*3.35,upper);
+    }
+    A.add(new T.CylinderGeometry(2.8,2.9,3.6,64),dark,0,FLOOR+1.8,0);
+    A.add(new T.CylinderGeometry(3.2,3.2,1.05,64,1,true,0,Math.PI),metal,0,FLOOR+0.55,0);
+    [0.12,1.08].forEach(h=>A.add(new T.TorusGeometry(3.22,0.04,8,64,Math.PI),warm,0,FLOOR+h,0,0,Math.PI/2));
+    const brand=canvasTexture(1024,320,(c,w,h)=>{c.fillStyle='#08111A';c.fillRect(0,0,w,h);c.fillStyle='#FFFFFF';c.textAlign='center';c.font=`bold 145px ${FONT.display}`;c.fillText('CFT',w/2,150);c.font=`38px ${FONT.mono}`;c.fillText('KINETIC MUSEUM',w/2,230);});
+    const reception=sign(3.8,1.18,brand,true);reception.position.set(0,FLOOR+2.3,2.88);scene.add(reception);
+    const crownLogo=sign(6.8,2.12,brand,true);crownLogo.position.set(0,roof-2.0,0.4);scene.add(crownLogo);
+    [3.0,4.7,6.6].forEach((r,i)=>{
+      A.add(new T.TorusGeometry(r,0.13,12,96),metal,0,roof-0.65-i*0.15,0,0,Math.PI/2);
+      A.add(new T.TorusGeometry(r-0.05,0.045,8,96),warm,0,roof-0.8-i*0.15,0,0,Math.PI/2);
+    });
+    for(let i=0;i<20;i++){
+      const a=i*Math.PI/10,x=Math.sin(a)*2.2,z=Math.cos(a)*2.2;
+      box(metal,0.014,10.6,0.014,x,upper+5.5,z);
+      for(let j=0;j<8;j++)A.add(new T.SphereGeometry(0.035,6,4),j%2?warm:blue,x,upper+0.7+j*1.35,z);
+    }
+    for(let side=0;side<2;side++){
+      const pts=[];
+      for(let i=0;i<=160;i++){const t=i/160,a=t*Math.PI*6+side*Math.PI;pts.push(new T.Vector3(Math.sin(a)*1.8,upper+0.4+t*9.5,Math.cos(a)*1.8));}
+      A.add(new T.TubeGeometry(new T.CatmullRomCurve3(pts),160,0.10,8),warm,0,0,0);
+    }
+    world.colliders.push({x:0,z:0,r:3.3,level:0});
+    world.kiosks.push({id:'desk',label:'Reception / choose your route',verb:'Explore',pos:new T.Vector3(0,FLOOR+1,3.5),radius:2.5});
+    const mapTex=canvasTexture(1024,1024,(c,w,h)=>{
+      c.fillStyle='#051526';c.fillRect(0,0,w,h);c.strokeStyle='#174365';c.lineWidth=1;
+      for(let i=0;i<32;i++){c.beginPath();c.moveTo(i*32,0);c.lineTo(i*32,h);c.moveTo(0,i*32);c.lineTo(w,i*32);c.stroke();}
+      c.strokeStyle='#7BCBFA';c.lineWidth=3;c.strokeRect(200,225,624,565);
+      CFT.LAYOUT.rooms.forEach((r,i)=>{if(r.central)return;const x=512+(r.x0+r.x1)*7,z=510+(r.z0+r.z1)*7;c.strokeRect(x-22,z-22,44,44);});
+      c.fillStyle='#FFFFFF';c.textAlign='center';c.font=`48px ${FONT.display}`;c.fillText('MUSEUM MAP',512,170);
+      c.font=`28px ${FONT.mono}`;c.fillText('27 PROJECTS / THREE GALLERIES',512,865);
+      c.fillStyle='#FFD27C';c.beginPath();c.arc(512,745,12,0,Math.PI*2);c.fill();c.font=`24px ${FONT.mono}`;c.fillText('YOU ARE HERE',512,792);
+    });
+    const mapDisc=new T.Mesh(new T.CircleGeometry(3.7,80),new T.MeshBasicMaterial({map:mapTex}));mapDisc.rotation.x=-Math.PI/2;mapDisc.position.set(0,FLOOR+0.06,10.5);scene.add(mapDisc);
+    [3.8,4.0].forEach(r=>A.add(new T.TorusGeometry(r,0.025,8,96),r<4?blue:warm,0,FLOOR+0.07,10.5,0,Math.PI/2));
+    world.kiosks.push({id:'map',label:'Museum floor map',verb:'Open map',pos:new T.Vector3(0,FLOOR+0.5,10.5),radius:3.8});
+    // Compact palms soften the metal balconies without hiding their exhibit signs.
+    const foliage=new T.MeshStandardMaterial({color:0x265536,roughness:0.83,side:T.DoubleSide});
+    for(const h of [0,4.4,8.8])for(const x of [-11.8,11.8])for(const z of [-11.8,9.3]){
+      A.add(new T.CylinderGeometry(0.32,0.26,0.6,16),metal,x,FLOOR+h+0.3,z);
+      A.add(new T.CylinderGeometry(0.045,0.09,1.5,8),M.bark,x,FLOOR+h+1.05,z);
+      for(let k=0;k<10;k++){
+        const leaf=new T.Shape();leaf.moveTo(0,0);leaf.quadraticCurveTo(0.3,0.45,0,1.35);leaf.quadraticCurveTo(-0.3,0.55,0,0);
+        const geo=new T.ShapeGeometry(leaf,8);geo.rotateX(-0.8-(k%3)*0.23);geo.rotateY(k*Math.PI/5);
+        A.add(geo,foliage,x,FLOOR+h+1.7,z);
+      }
+    }
     // Transparent elevator display, offset so the main entrance remains clear.
     const ex=-11.2,ez=11.8;
     A.add(new T.CylinderGeometry(1.45,1.45,8.4,40,1,true),glass,ex,FLOOR+4.2,ez);
@@ -137,22 +218,29 @@
   };
   // Stairs are solid; balconies can be walked underneath at ground level.
   CFT.atriumHeight = function(x,z,y,floor) {
-    const ax=Math.abs(x),up=floor+4.4;
-    if(y>floor+0.38 && z>0 && z<9 && ((ax>5.4 && ax<=5.75)||(ax>=8.25 && ax<8.6)))return null;
-    if(ax>5.75 && ax<8.25 && z>=0 && z<=9) return floor+Math.min(20,Math.floor((9-z)/0.45)+1)*0.22;
-    if(y<up-0.38)return undefined;
-    if(ax>=9 && ax<=12.55 && z>=-0.4 && z<0)return up;
+    const ax=Math.abs(x),mid=floor+4.4,top=floor+8.8;
+    if(y>=mid-0.38 && Math.hypot(x,z)>3.08 && Math.hypot(x,z)<3.7 && Math.abs(z)>1.1)return null;
+    // The reception is below a middle-level podium and its two connecting bridges.
+    if(y>=mid-0.38 && Math.hypot(x,z)<3.45)return mid;
+    if(y>=mid-0.38 && ax>=3.4 && ax<5.8 && Math.abs(z)<0.78)return mid;
+    if(y>=mid-0.38 && ax>=3.4 && ax<5.8 && Math.abs(z)<1.15)return null;
+    if(y>=mid-0.38 && y<top-0.38 && ax>5.5 && ax<12.55 && Math.abs(z)<=0.4)return mid;
+    if(y>floor+0.38 && z>0.4 && z<9 && ((ax>5.4 && ax<=5.75)||(ax>=8.25 && ax<8.6)))return null;
+    if(ax>5.75 && ax<8.25 && z>=0 && z<=9)return floor+Math.min(20,Math.floor((9-z)/0.45)+1)*0.22;
+    if(y>=mid-0.38 && ax>5.75 && ax<8.25 && z< -0.4 && z>=-9.4)return mid+Math.min(20,Math.floor((-z-0.4)/0.45)+1)*0.22;
+    if(y>=mid-0.38 && z< -0.4 && z> -9.4 && ((ax>5.4&&ax<=5.75)||(ax>=8.25&&ax<8.6)))return null;
+    if(y<mid-0.38)return undefined;
+    const deck=y>=top-0.38?top:mid;
+    if(ax>=9 && ax<=12.55 && z>=-0.4 && z<0)return deck;
     if(z>=0 && z<10.35 && ax>8.25 && ax<13.25){
-      if(ax<9.0 || ax>12.55 || z>9.65)return null;
-      return up;
+      if(ax<9.0||ax>12.55||z>9.65)return null;
+      return deck;
     }
-    if(ax>5.75 && ax<8.25 && z<0 && z> -0.4)return up;
     if(ax<13.25 && z>-13.25 && z<0.4){
       if(ax>12.55 || z< -12.55)return null;
-      if(z< -10.15 || (ax>5.75 && z< -0.35))return up;
+      if(z< -10.15 || (ax>8.6 && z< -0.35) || (ax>5.75 && z<=-9.4))return deck;
       if(ax<5.75 && z< -9.45)return null;
       if(ax>5.05 && ax<5.75)return null;
-      if(ax>8.25 && z> -0.35)return null;
     }
     return undefined;
   };
