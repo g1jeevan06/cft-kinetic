@@ -4,6 +4,7 @@ Craftech360's kinetic installation museum, playable in the browser (desktop, iPh
 
 - Open `index.html` from a web server (for example GitHub Pages), or double-click it to play offline.
 - `models/` installation models, `videos/` screen videos, `showreel/showreel.mp4` the showreel, `vendor/` three.js.
+- `asset-pipeline.js` prepares loaded models with frustum culling, distance LOD and PBR texture filtering. `assets/asset-manifest.json` and [ASSET_PIPELINE.md](ASSET_PIPELINE.md) define the GLB/Draco/Meshopt, KTX2/Basis and HDR/EXR handoff paths.
 
 ## 27-project environment rebuild
 

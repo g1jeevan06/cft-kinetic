@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "modelFormat": "GLB",
+  "compression": ["Draco", "Meshopt"],
+  "textureFormat": "KTX2/Basis",
+  "environmentFormat": "HDR/EXR",
+  "modelRoot": "models/optimized/",
+  "textureRoot": "assets/textures/",
+  "hdrRoot": "assets/hdr/",
+  "assets": [],
+  "fallback": "Current procedural model builders and the RoomEnvironment PMREM fallback are used until source exports are added."
+}

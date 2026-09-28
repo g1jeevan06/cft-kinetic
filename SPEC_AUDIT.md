@@ -24,7 +24,7 @@ Compared with the supplied project brief:
 - AR view, share action, playlist/video-quality controls, captions and presentation mode are not implemented.
 - Achievement XP/levels/progress bars and reward tiers are only a basic unlocked/locked journal state.
 - Settings still need theme, text size, high contrast, language, subtitles, haptics, notifications, privacy and clear-cache controls.
-- Reflection probes, compressed textures, Draco/Meshopt LOD assets and occlusion culling need a production asset pass.
+- Runtime LOD/frustum culling, mipmap/anisotropy texture preparation and PMREM material fallback are wired. Optimized GLB/Draco/Meshopt, KTX2 and HDR/EXR source files still need to be exported into the declared asset directories.
 - The brief's ten named sample exhibits are represented by the existing CFT 27-project catalogue; matching replacement GLB exports can be swapped through `catalog-builders.js` without changing the interaction system.
 
 ## Priority order
