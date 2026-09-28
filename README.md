@@ -20,3 +20,5 @@ Source files for Aurora, Nebula and the telescopic display were located but need
 `catalog.js` owns the project list and source aliases. `gallery-layout.js` sets the three-tier display layout and stair routes. `atrium.js` builds the architecture and defines floor heights. `catalog-builders.js` selects model builders or reservations. `drawing-catalog.js` lists imported drawing pages. `navigation.js` finds routes around obstacles. Tests cover both stair flights, tier assignments, the podium bridges and routes to and from every elevated display.
 
 Run `node check-collection.cjs` to check scripts, catalogue, hall layout, drawing assets and obstacle routing. Preview with `python -m http.server 8765 --bind 127.0.0.1` from this directory.
+
+The complete screen-to-screen experience is documented in [GAME_FLOW.md](GAME_FLOW.md), including the reference screen names, controls, and return paths.
