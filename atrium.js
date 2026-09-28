@@ -2,12 +2,12 @@
 (function () {
   CFT.buildReferenceAtrium = function (A,M,D,scene,world,T,Geo,FLOOR,TOP,canvasTexture,sign,FONT,plant) {
     const upper=FLOOR+4.4, crown=FLOOR+8.8, roof=FLOOR+17;
-    const metal=new T.MeshStandardMaterial({color:0x101820,roughness:0.24,metalness:0.82});
-    const stone=new T.MeshStandardMaterial({color:0x344653,roughness:0.19,metalness:0.65});
-    const dark=new T.MeshStandardMaterial({color:0x101E28,roughness:0.44,metalness:0.3});
-    const glass=new T.MeshStandardMaterial({color:0x63B9DC,transparent:true,opacity:0.2,roughness:0.1,metalness:0.1,side:T.DoubleSide,depthWrite:false});
+    const metal=new T.MeshStandardMaterial({color:0x111B24,roughness:0.22,metalness:0.9});
+    const stone=new T.MeshStandardMaterial({color:0x1D2B36,roughness:0.24,metalness:0.62});
+    const dark=new T.MeshStandardMaterial({color:0x08121B,roughness:0.38,metalness:0.48});
+    const glass=new T.MeshStandardMaterial({color:0x3D9BC7,transparent:true,opacity:0.22,roughness:0.08,metalness:0.25,side:T.DoubleSide,depthWrite:false});
     const blue=new T.MeshBasicMaterial({color:0x49CFFF});
-    const warm=new T.MeshBasicMaterial({color:0xFFE0A8});
+    const warm=new T.MeshBasicMaterial({color:0xF4B84E});
     warm.toneMapped=false;blue.toneMapped=false;
     const box=(m,w,h,d,x,y,z)=>A.box(m,w,h,d,x,y,z);
     const rail=(x1,z1,x2,z2,y)=>{
