@@ -6108,7 +6108,7 @@ CFT.loadModels = onProgress => {
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     // Start inside the atrium so the first playable view immediately presents the three-tier museum.
-    player: { pos: new T.Vector3(0, 0, 19.5), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
+    player: { pos: new T.Vector3(0, 0, 10), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
     camY: EYE, zone: { id: 'plaza', name: 'Entrance Plaza' }, focus: null, REQ, BONUS, usePost: false
   };
 
@@ -6664,7 +6664,7 @@ CFT.loadModels = onProgress => {
     placePlayer(t.x, ex.pos.y, t.z, t.yaw, 0.12);
     if (viaMap) { G.award('wayfinder'); UI().toast(`Arrived at ${ex.data.name}`, ex.data.pendingModel ? 'Press E for project details and available drawings.' : 'Press E to bring it to life.'); }
   };
-  G.returnToLobby = function () { placePlayer(0, G.world.FLOOR, 19.5, 0, 0.12); };
+  G.returnToLobby = function () { placePlayer(0, G.world.FLOOR, 10, 0, 0.12); };
 
   // ---------------------------------------------------------------- Interaction
   const fwd = new T.Vector3();
@@ -6855,7 +6855,7 @@ CFT.loadModels = onProgress => {
   function endCinematic() {
     $('cine').hidden = true;
     G.world.doors.force = false;
-    placePlayer(0, G.world.FLOOR, 19.5, 0, 0.12);
+    placePlayer(0, G.world.FLOOR, 10, 0, 0.12);
     G.setPhase('play');
     $('hud').hidden = false;
     UI().toast('Walk inside', 'W A S D to move, mouse to look, Shift to walk faster. The doors open as you approach.');
@@ -6965,7 +6965,7 @@ CFT.loadModels = onProgress => {
     G.state.progress = normaliseProgress(s && s.progress);
     resetExhibits(); UI().updateProgress(); updateBeacon();
     $('title').hidden = true; $('hud').hidden = false;
-    placePlayer(0, G.world.FLOOR, 19.5, 0, 0.12);
+    placePlayer(0, G.world.FLOOR, 10, 0, 0.12);
     G.zone = G.world.zoneAt(0, 10);
     $('zone-name').textContent = G.zone.name;
     G.resumePlay();
