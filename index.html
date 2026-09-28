@@ -81,7 +81,7 @@
   @media (max-width: 760px) { .title-controls .controls tbody { grid-template-columns: repeat(2, auto); } }
   /* Too narrow or too short for the plaza placement: put the start button back under the wordmark. */
   @media (max-width: 900px), (max-height: 560px) {
-    #title > .title-actions { position: absolute; left: 18px; right: 18px; bottom: 18px; justify-content: center; margin-top: 0; }
+    #title > .title-actions { position: absolute; left: 12px; right: 12px; bottom: 18px; justify-content: flex-start; margin-top: 0; gap: 8px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
     #title > .cft-links { position: absolute; top: 12px; right: 18px; width: auto; margin: 0; }   /* keep the compact title clean */
   }
   @media (max-height: 560px) {
