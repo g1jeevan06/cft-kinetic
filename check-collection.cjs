@@ -1,0 +1,40 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const read = name => fs.readFileSync(path.join(__dirname, name), 'utf8');
+const html = read('index.html');
+const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+scripts.forEach((s,i) => new vm.Script(s, {filename:'inline-'+i}));
+const ctx = vm.createContext({}); ctx.window = ctx;
+vm.runInContext(scripts.find(s => s.includes('CFT.EXHIBITS = [')), ctx);
+ctx.CFT.DRAWINGS = {};
+for (const f of ['catalog.js','drawing-catalog.js','navigation.js']) vm.runInContext(read(f), ctx);
+new vm.Script(read('catalog-builders.js'));
+const c = ctx.CFT;
+assert.equal(c.EXHIBITS.length,27);
+assert.equal(new Set(c.EXHIBITS.map(e => e.id)).size,27);
+assert.equal(c.EXHIBITS.filter(e => e.pendingModel).length,15);
+assert.equal(c.EXHIBITS[26].name,'NOVA SPIN');
+assert.equal(c.EXHIBITS[11].sourceId,'tri-helix');
+assert.equal(c.EXHIBITS[12].sourceId,null);
+const rooms = c.LAYOUT.rooms, bounds = c.LAYOUT.building;
+rooms.forEach((r,i) => {
+  assert.equal(r.id,c.EXHIBITS[i].id);
+  assert(r.x0>=bounds.x0 && r.x1<=bounds.x1 && r.z0>=bounds.z0 && r.z1<=bounds.z1);
+  rooms.slice(i+1).forEach(s => assert(!(r.x0<s.x1 && r.x1>s.x0 && r.z0<s.z1 && r.z1>s.z0),'overlapping halls'));
+});
+Object.values(c.DRAWING_PAGES).flat().forEach(f => assert(fs.existsSync(path.join(__dirname,f)), f));
+assert(c.activityAvailable(c.EXHIBITS[12],'diagram'));
+assert(!c.activityAvailable(c.EXHIBITS[26],'video'));
+const area = {x0:-20,x1:20,z0:-20,z1:20};
+const floor = (x,z) => Math.abs(x)>=20 || Math.abs(z)>=20 || (Math.abs(x)<2 && Math.abs(z)<9) ? null : 0;
+const route = c.findWalkPath({x:-12,z:0},{x:12,z:0},floor,area);
+assert(route && route.length>2,'must route around obstacle');
+for(let i=1;i<route.length;i++) {
+  const a=route[i-1],b=route[i],n=Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.1);
+  for(let j=0;j<=n;j++) assert.notEqual(floor(a.x+(b.x-a.x)*j/n,a.z+(b.z-a.z)*j/n),null);
+}
+assert.equal(c.findWalkPath({x:-12,z:0},{x:12,z:0},(x,z)=>Math.abs(x)<2?null:floor(x,z),area),null);
+assert.equal(c.findWalkPath({x:-12,z:12},{x:12,z:12},floor,area).length,2);
+console.log('PASS: script syntax, 27 unique halls, 12 model aliases, 15 pending models, hall bounds and overlap, drawing assets, eligible progress, obstacle routing and unreachable routes.');

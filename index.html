@@ -91,7 +91,7 @@
   #compass-target { font: 500 12px var(--mono); letter-spacing: 0.04em; background: var(--hud); padding: 4px 10px; color: var(--signal); white-space: nowrap; }
   .progress { justify-self: end; text-align: right; }
   #progress-count { font: 600 15px var(--body); font-variant-numeric: tabular-nums; margin-left: 6px; }
-  #progress-ticks { display: flex; gap: 4px; margin-top: 7px; }
+  #progress-ticks { display: flex; flex-wrap: wrap; max-width: 240px; gap: 3px; margin-top: 7px; }
   #progress-ticks span { width: 14px; height: 6px; background: rgba(238, 241, 242, 0.2); }
   #progress-ticks span.on { background: var(--hall); }
   #crosshair { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); transition: transform 0.15s, background 0.15s; }
@@ -439,6 +439,9 @@
   #lightbox img { max-width: 100%; max-height: calc(100vh - 90px); width: auto; border: 1px solid var(--rule); }
   #lightbox p { color: var(--hud-dim); margin: 0; }
   .map-drawing { margin: 0 0 14px; border: 1px solid var(--rule-2); background: #02080D; }
+  .map-drawing { height: 166px; overflow: hidden; }
+  .map-drawing[hidden] { display: block !important; visibility: hidden; }
+  .map-drawing img { height: 130px; object-fit: contain; }
   .map-drawing figcaption { padding: 6px 10px; font: 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--signal); }
   /* Craftech360 company profile (the lobby boards' "About Craftech360" sheet) */
   .company-map { margin: 16px 0 0; border: 1px solid var(--rule-2); background: #141414; }
@@ -511,7 +514,7 @@
   </div>
   <div class="title-foot">
     <div class="title-controls">
-      <p class="specline"><b>9</b> installations · <b>3</b> expansion halls · <b>80 × 60</b> m · <b>0</b> fail states</p>
+      <p class="specline"><b>27</b> project halls · <b>3</b> exhibition wings · <b>164 × 132</b> m · <b>0</b> fail states</p>
       <p class="specline byline">Game design &amp; build by <b>CFT 3D Team</b></p>
       <div class="eyebrow">Controls</div><div id="controls-title"></div>
       <p class="title-note">Best with a keyboard and mouse. Sound and narration are on — adjust them from the pause menu.</p></div>
@@ -527,7 +530,7 @@
   <div class="hud-top">
     <div class="chip zone"><img class="chip-mark" data-logo="mark" alt=""><div><span class="eyebrow">CFT Kinetic</span><span id="zone-name">Entrance Plaza</span></div></div>
     <div class="compass-wrap"><canvas id="compass" width="440" height="34" aria-hidden="true"></canvas><div id="compass-target" hidden></div></div>
-    <div class="chip progress"><span class="eyebrow">Installations</span><span id="progress-count">0/9</span><div id="progress-ticks"></div></div>
+    <div class="chip progress"><span class="eyebrow">Installations</span><span id="progress-count">0/27</span><div id="progress-ticks"></div></div>
   </div>
   <div id="crosshair"></div>
   <div id="prompt" hidden><kbd class="kbd">E</kbd><span id="prompt-verb">Interact</span><strong id="prompt-name"></strong></div>
@@ -592,6 +595,9 @@
     <aside class="map-aside">
       <figure class="map-drawing" id="map-drawing" hidden><img alt=""><figcaption></figcaption></figure>
       <div class="eyebrow">Jump to an installation</div>
+      <label class="eyebrow" for="map-search">Find a project</label>
+      <input id="map-search" type="search" placeholder="Name or hall number" autocomplete="off" style="width:100%;margin:10px 0 16px;padding:12px;background:#101820;border:1px solid #53606C;color:#fff;border-radius:6px">
+      <p id="map-search-status" class="note" role="status" hidden></p>
       <ul class="hall-list" id="map-list"></ul>
       <p class="map-legend">Amber arrow — you are here<br>Dashed line — guided route<br>Lit room — visited</p>
     </aside>
@@ -1132,6 +1138,9 @@ CFT.VIDEO_URLS = {};
 CFT.VIDEO_SCRIPT = 'videos/videos.js';
 </script>
 
+<script src="catalog.js"></script>
+<script src="drawing-catalog.js"></script>
+<script src="navigation.js"></script>
 <script>
 // CFT Kinetic — the team's real installation models (glTF, exported from their Blender files).
 // js/models-data.js holds them as base64 (pack-museum.ps1 writes it from source\museum\models\*.glb),
@@ -2662,10 +2671,12 @@ CFT.loadModels = onProgress => {
   };
   Object.keys(REAL).forEach(id => { const proc = B[id]; B[id] = o => fromModel(id, Object.assign({}, o, REAL[id])) || proc(o); });
 
+  CFT.buildSourceModel = fromModel;
   CFT.EXHIBIT_BUILDERS = B;
 })();
 
 </script>
+<script src="catalog-builders.js"></script>
 <script>
 // CFT Kinetic — building, lighting, collision and floor plan.
 // Layout follows the CFT floor-plan boards: 80 × 60 m building, circular lobby, exhibition rooms on the
@@ -2673,34 +2684,16 @@ CFT.loadModels = onProgress => {
 (function () {
   const T = THREE, Geo = CFT.Geo;
   const FLOOR = 0.75, CEIL = 7.0, TOP = FLOOR + CEIL, BUILD_H = 8;
-  const HALL = { x0: -28, x1: 28, z0: -18, z1: 18 };
+  const HALL = CFT.LAYOUT.promenade;
   const LOBBY_R = 12.5;
-  const BLD = { x0: -40, x1: 40, z0: -30, z1: 30 };
+  const BLD = CFT.LAYOUT.building;
   const PAV = { x0: -10, x1: 10, z0: 30, z1: 41 };
   const DOOR_Z = 40.6, OPEN_H = 6.5;
   const PORCH = { x0: -8, x1: 8, z0: 41, z1: 45 };
   const STEPS = { x0: -5, x1: 5, z0: 45, z1: 46.2 };
-  const DOOR_W = 2.4, DOOR_H = 2.4, GLASS_H = 4.6, PR = 0.35;
+  const DOOR_W = 3.2, DOOR_H = 3.2, GLASS_H = 4.6, PR = 0.35;
   const FACE = { '+z': [0, 1], '-z': [0, -1], '+x': [1, 0], '-x': [-1, 0] };
-  const ROOMS = [
-    // North wall: four halls sharing the full 56 m (Helix was removed, so the remaining four widened
-    // from 11.2 to 14 m rather than leaving a gap in the row).
-    // Hexora took DNA's old room on the north wall; DNA moved to the south wall beside the entrance so
-    // Hall 01 is the first hall a visitor meets on walking in.
-    { id: 'hexora', x0: 0, x1: 14, z0: -29.7, z1: -18, face: '+z' },
-    { id: 'sliding-dna', x0: -28, x1: -16.5, z0: 18, z1: 29.7, face: '-z' },
-    { id: 'hmrs', x0: -39.7, x1: -28, z0: 6, z1: 18, face: '+x' },
-    { id: 'c-hmrs', x0: -39.7, x1: -28, z0: -6, z1: 6, face: '+x' },
-    { id: 'tri-helix', x0: -39.7, x1: -28, z0: -18, z1: -6, face: '+x' },
-    { id: 'kuka-bot', x0: -28, x1: -14, z0: -29.7, z1: -18, face: '+z' },
-    { id: 'nova-bot', x0: -14, x1: 0, z0: -29.7, z1: -18, face: '+z' },
-    // No café or restrooms: the user did not want them, so the east half of the south wall is plain wall.
-    { id: 'dna', x0: -16.5, x1: -5, z0: 18, z1: 29.7, face: '-z' },
-    { id: 'triblock', x0: 14, x1: 28, z0: -29.7, z1: -18, face: '+z' },
-    { id: 'matrix', x0: 28, x1: 39.7, z0: -18, z1: -6, face: '-x' },
-    { id: 'flying-screen', x0: 28, x1: 39.7, z0: -6, z1: 6, face: '-x' },
-    { id: 'kinetic-mobile', x0: 28, x1: 39.7, z0: 6, z1: 18, face: '-x' }
-  ];
+  const ROOMS = CFT.LAYOUT.rooms;
   // Brand typefaces (Craftech360 Brand Guidelines, Typography): PolySans primary, Helvetica secondary.
   // Neither is a webfont, so each stack names the brand face first and falls back to what the browser has.
   const FONT = {
@@ -3160,12 +3153,12 @@ CFT.loadModels = onProgress => {
       const R = 1240, colW = 380;
       c.fillStyle = '#FECC00'; c.font = `${Math.round(26 * u)}px ${FONT.mono}`; c.fillText('KINETIC INSTALLATIONS', R, 112 * u);
       c.fillStyle = 'rgba(254, 204, 0, 0.5)'; c.fillRect(R, 128 * u, colW * 2 - 40, 2);
-      const list = CFT.EXHIBITS.slice(0, 12), rows = Math.ceil(list.length / 2);
+      const list = CFT.EXHIBITS, rows = Math.ceil(list.length / 2);
       list.forEach((e, i) => {
         const x = R + (i % 2) * colW, y = (182 + Math.floor(i / 2) * (230 / Math.max(1, rows - 1))) * u;
         c.fillStyle = e.accent; c.fillRect(x, y - 18 * u, 14 * u, 14 * u);
         c.fillStyle = '#7F8A93'; c.font = `${Math.round(18 * u)}px ${FONT.mono}`; c.fillText(pad2(i + 1), x + 26 * u, y - 4 * u);
-        c.fillStyle = '#E8ECEF'; c.font = `${Math.round(28 * u)}px ${FONT.body}`; c.fillText(e.name, x + 62 * u, y - 2 * u);
+        c.fillStyle = '#E8ECEF'; c.font = `${Math.round(17 * u)}px ${FONT.body}`; c.fillText(e.name, x + 62 * u, y - 2 * u, colW - 70 * u);
       });
     });
     const mural = sign(W, H, muralTex, true); mural.position.set(mid, MY, WZ); mural.rotation.y = Math.PI; scene.add(mural);
@@ -3186,7 +3179,7 @@ CFT.loadModels = onProgress => {
     });
     const rackSign = sign(2.2, 0.41, rackTex, true); rackSign.position.set(RX, FLOOR + 2.0, RZ + 0.05); rackSign.rotation.y = Math.PI; scene.add(rackSign);
     [0.14, 0.61, 1.08].forEach(y => A.box(M.gold, 2.2, 0.03, 0.14, RX, FLOOR + y, RZ - 0.07));
-    CFT.EXHIBITS.slice(0, 12).forEach((e, i) => {
+    CFT.EXHIBITS.forEach((e, i) => {
       const tex = canvasTexture(256, 340, (c, w, h) => {
         c.fillStyle = '#0B0E11'; c.fillRect(0, 0, w, h); c.textBaseline = 'alphabetic';
         c.fillStyle = '#FECC00'; c.fillRect(20, 24, 60, 6);
@@ -3197,8 +3190,8 @@ CFT.loadModels = onProgress => {
         c.fillStyle = '#111111'; c.font = `17px ${FONT.mono}`; c.fillText('CATALOGUE · HALL ' + pad2(i + 1), 20, h * 0.5 + 44);
         c.fillStyle = '#9AA4AD'; c.font = `14px ${FONT.mono}`; c.fillText('CRAFTECH360.COM', 20, h - 22);
       });
-      const col = i % 4, row = Math.floor(i / 4), cover = sign(0.4, 0.53, tex, true);
-      cover.position.set(RX + 0.795 - col * 0.53, FLOOR + 1.08 - row * 0.47 + 0.28, RZ - 0.1);
+      const col = i % 9, row = Math.floor(i / 9), cover = sign(0.2, 0.4, tex, true);
+      cover.position.set(RX + 0.98 - col * 0.245, FLOOR + 1.08 - row * 0.47 + 0.28, RZ - 0.1);
       cover.rotation.y = Math.PI; cover.rotateX(-0.15);
       scene.add(cover);
     });
@@ -3648,6 +3641,52 @@ CFT.loadModels = onProgress => {
     });
   }
 
+  function buildCollectionPromenade(A, M, D, scene, world) {
+    const label = (title, subtitle, color, x, z, ry = 0) => {
+      const tex = canvasTexture(1536, 320, (c, w, h) => {
+        c.fillStyle = '#111B27'; c.fillRect(0, 0, w, h);
+        c.fillStyle = color; c.fillRect(55, 48, 90, 7);
+        c.fillStyle = '#F1F4F7'; c.font = `82px ${FONT.display}`; c.fillText(title, 55, 165);
+        c.fillStyle = color; c.font = `36px ${FONT.mono}`; c.fillText(subtitle, 58, 255);
+      });
+      const panel = sign(8.4, 1.75, tex, true); panel.position.set(x, 5.6, z); panel.rotation.y = ry; scene.add(panel);
+      const back = new T.Mesh(Geo.roundedBox(8.6, 1.95, 0.18, 0.07), M.metal); back.position.copy(panel.position); back.rotation.y = ry;
+      back.position.add(V(-Math.sin(ry)*0.12,0,-Math.cos(ry)*0.12)); scene.add(back);
+    };
+    label('WEST WING', '01—09  /  DNA → KUKA BOT', '#E9B44C', -42, 11);
+    label('NORTH WING', '10—18  /  NOVA WITH HOLO FAN → L HMRS', '#8DA4FF', 0, -25);
+    label('EAST WING', '19—27  /  TELESCOPIC LED DISPLAY → NOVA SPIN', '#29E0C2', 42, 11);
+    // Continuous illuminated lanes, clear sightlines and three seating islands.
+    [-62,62].forEach(x => {
+      A.box(M.glowGold,0.09,0.014,104,x,FLOOR+0.016,-34);
+      A.box(M.metal,0.22,0.018,104,x,FLOOR+0.01,-34);
+      for (let z=12;z>=-84;z-=12) {
+        downlight(D,x,z,{size:5.5,k:0.17});
+        world.anchors.push({pos:V(x,5,z),color:WARM.clone(),base:0.65,range:15});
+      }
+    });
+    [-5.5,5.5].forEach(x => A.box(M.glowGold,0.07,0.016,63,x,FLOOR+0.018,-53));
+    A.box(M.glowGold,124,0.016,0.09,0,FLOOR+0.018,-82);
+    for (let z=-26;z>=-78;z-=13) {
+      A.box(M.glowWarm,8,0.025,0.16,0,TOP-0.09,z);
+      downlight(D,0,z,{size:7,k:0.18});
+      world.anchors.push({pos:V(0,5,z),color:WARM.clone(),base:0.6,range:17});
+    }
+    [-32,32].forEach(x => [-40,-65].forEach(z => {
+      A.add(Geo.roundedBox(7,0.65,4,0.2),M.white,x,FLOOR+0.325,z);
+      A.box(M.bark,6.5,0.04,3.5,x,FLOOR+0.66,z);
+      for (let i=-2;i<=2;i++) plant(A,M,x+i*1.1,z,FLOOR+0.67);
+      world.colliders.push({x0:x-3.7,x1:x+3.7,z0:z-2.2,z1:z+2.2});
+      buildLounge(A,M,D,world,x,z+5.5);
+    }));
+    // Structural rhythm along the centre of each wing, outside the doorway lanes.
+    [-48,48].forEach(x => [-18,-42,-66].forEach(z => {
+      A.add(new T.CylinderGeometry(0.32,0.42,CEIL,20),M.white,x,FLOOR+CEIL/2,z);
+      A.box(M.glowGold,0.035,CEIL-0.5,0.035,x,FLOOR+CEIL/2,z+0.43);
+      world.colliders.push({x,z,r:0.6});
+    }));
+  }
+
   function buildEntranceAndExterior(A, M, D, scene, world) {
     // Entrance hall through the south rooms, then the pavilion.
     for (let z = 20; z <= 28; z += 4) { downlight(D, -2.5, z); downlight(D, 2.5, z); scallop(D, -4.74, z, 1, 0, { k: 0.34 }); scallop(D, 4.74, z, -1, 0, { k: 0.34 }); }
@@ -3739,15 +3778,15 @@ CFT.loadModels = onProgress => {
     A.slab(M.ceil, BLD.x0, TOP, -HO, -HO, BUILD_H, HO); A.slab(M.ceil, HO, TOP, -HO, BLD.x1, BUILD_H, HO);
     [[BLD.x0, BLD.z0, BLD.x1, BLD.z0 + 0.2], [BLD.x0, BLD.z1 - 0.2, BLD.x1, BLD.z1], [BLD.x0, BLD.z0, BLD.x0 + 0.2, BLD.z1], [BLD.x1 - 0.2, BLD.z0, BLD.x1, BLD.z1]]
       .forEach(([x0, z0, x1, z1]) => A.slab(M.clad, x0, BUILD_H, z0, x1, BUILD_H + 0.2, z1));
-    A.box(M.glowAmber, 80, 0.05, 0.05, 0, BUILD_H - 0.35, BLD.z1 + 0.02);
+    A.box(M.glowAmber, BLD.x1 - BLD.x0, 0.05, 0.05, 0, BUILD_H - 0.35, BLD.z1 + 0.02);
     // The building render's signature: one crisp white light line running the whole façade at mid height,
     // returning down both side walls, with the warm wall-wash below it.
-    [[-40, -5], [5, 40]].forEach(([x0, x1]) => A.box(M.glowAmber, x1 - x0, 0.06, 0.06, (x0 + x1) / 2, FLOOR + 3.5, BLD.z1 + 0.04));
-    [BLD.x0 + 0.04, BLD.x1 - 0.04].forEach(x => A.box(M.glowAmber, 0.06, 0.06, 60, x, FLOOR + 3.5, 0));
-    for (let x = -37; x <= 37; x += 4.5) if (Math.abs(x) > 8) scallop(D, x, BLD.z1, 0, 1, { up: true, top: 7.6, h: 7.2, w: 2.8, k: 0.55 });
+    [[BLD.x0, -5], [5, BLD.x1]].forEach(([x0, x1]) => A.box(M.glowAmber, x1 - x0, 0.06, 0.06, (x0 + x1) / 2, FLOOR + 3.5, BLD.z1 + 0.04));
+    [BLD.x0 + 0.04, BLD.x1 - 0.04].forEach(x => A.box(M.glowAmber, 0.06, 0.06, BLD.z1 - BLD.z0, x, FLOOR + 3.5, (BLD.z0 + BLD.z1) / 2));
+    for (let x = BLD.x0 + 3; x <= BLD.x1 - 3; x += 4.5) if (Math.abs(x) > 8) scallop(D, x, BLD.z1, 0, 1, { up: true, top: 7.6, h: 7.2, w: 2.8, k: 0.55 });
     [-30, -18, 18, 30].forEach(x => world.anchors.push({ pos: V(x, 3.2, BLD.z1 + 2.5), color: WARM.clone(), base: 0.5, range: 16 }));
     // Planters of low shrubs hugging the façade, uplit, as in the render.
-    for (let x = -34; x <= 34; x += 4.6) {
+    for (let x = BLD.x0 + 6; x <= BLD.x1 - 6; x += 4.6) {
       if (Math.abs(x) < 8) continue;                       // keep the approach to the doors clear
       A.box(M.stone, 3.6, 0.62, 1.5, x, 0.31, BLD.z1 + 1.15);
       A.box(M.gold, 3.64, 0.04, 1.54, x, 0.62, BLD.z1 + 1.15);
@@ -3997,7 +4036,7 @@ CFT.loadModels = onProgress => {
   // The museum stands on a big octagonal platform out at sea: a pale deck with a glass rail and a light line round
   // its edge, a lower dock ring below it, then open water with glowing buoys tethered to the platform, drones
   // circling overhead and more stations far off in the haze.
-  const SEA = { cx: 0, cz: 15, R: 88, water: -11 };   // the deck is raised well above the sea on legs
+  const SEA = { cx: 0, cz: 15, R: 180, water: -11 };   // the deck is raised well above the sea on legs
   SEA.apo = SEA.R * Math.cos(Math.PI / 8);
   // Four bridges, two off each side of the deck (z = cz ± 22), each to a satellite station of radius SR at x = ±SX.
   SEA.SR = 16; SEA.SX = SEA.apo + 58 + SEA.SR; SEA.BZ = [-22, 22]; SEA.BW = 5;
@@ -4231,14 +4270,14 @@ CFT.loadModels = onProgress => {
 
     // Interior floor: reflective plane under a translucent marble layer (high quality).
     if (T.Reflector) {
-      const rf = new T.Reflector(new T.PlaneGeometry(80, 71), {
+      const rf = new T.Reflector(new T.PlaneGeometry(BLD.x1 - BLD.x0, PAV.z1 - BLD.z0), {
         clipBias: 0.003, color: 0x39424E,
         textureWidth: Math.round(window.innerWidth * 0.5), textureHeight: Math.round(window.innerHeight * 0.5)
       });
-      rf.rotation.x = -Math.PI / 2; rf.position.set(0, FLOOR, 5.5);
+      rf.rotation.x = -Math.PI / 2; rf.position.set(0, FLOOR, (PAV.z1 + BLD.z0) / 2);
       scene.add(rf); world.reflector = rf;
     }
-    [[0, 0, 79.4, 59.4], [0, 35.35, 10, 11.3]].forEach(([x, z, w, d]) => {
+    [[0, (BLD.z0 + BLD.z1) / 2, BLD.x1 - BLD.x0 - 0.6, BLD.z1 - BLD.z0 - 0.6], [0, 35.35, 10, 11.3]].forEach(([x, z, w, d]) => {
       const f = new T.Mesh(Geo.planeUV(w, d, 2.4), M.floor);
       f.rotation.x = -Math.PI / 2; f.position.set(x, FLOOR + 0.005, z); f.renderOrder = 1;
       f.receiveShadow = true;
@@ -4310,6 +4349,7 @@ CFT.loadModels = onProgress => {
       else roomSign(scene, r, 0, 'Restrooms', '#9AA4AD');
     });
     buildLobby(A, M, D, scene, world);
+    buildCollectionPromenade(A, M, D, scene, world);
     buildEntranceAndExterior(A, M, D, scene, world);
     buildGrandFacade(A, M, D, scene, world, TX);
     buildSea(A, M, D, scene, world, TX);
@@ -4486,7 +4526,16 @@ CFT.loadModels = onProgress => {
           pts.splice(i + 1, 0, { x: nx * k, z: nz * k }); i++;
         }
       }
-      return pts;
+      const routed = [pts[0]];
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i-1], b = pts[i];
+        if (inRect(a.x,a.z,HALL,0) && inRect(b.x,b.z,HALL,0)) {
+          const path = CFT.findWalkPath(a,b,world.floorAt,HALL);
+          if (path) { routed.push(...path.slice(1)); continue; }
+        }
+        routed.push(b);
+      }
+      return routed;
     };
     world.pickAt = function (x, z) {
       const r = ROOMS.find(rr => rr.exhibit && x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
@@ -4568,8 +4617,8 @@ CFT.loadModels = onProgress => {
   CFT.mapTransform = function (w, h) {
     // Plan content runs z -30 (back wall) to +50 (foot of the entrance steps) and x -40..40, so fit 84 x 84
     // and shift the centre down by the 10-unit offset between the two. #map-canvas carries the same 1:1 shape.
-    const s = Math.min(w / 84, h / 84);
-    return { s, cx: w / 2, cy: h / 2 - 10 * s };
+    const s = Math.min(w / (BLD.x1 - BLD.x0 + 12), h / (50 - BLD.z0 + 12));
+    return { s, cx: w / 2, cy: h / 2 - (BLD.z0 + 50) / 2 * s };
   };
   CFT.SKY_NAMES = { sunset: 'Sunset sea · golden hour', night: 'Night sea · stars', sea: 'Open sea · day', johannesburg: 'Johannesburg skyline · sunset', dusseldorf: 'Düsseldorf harbour · blue hour', shanghai: 'Shanghai Bund · night' };
 
@@ -4586,11 +4635,11 @@ CFT.loadModels = onProgress => {
     c.strokeStyle = ink; c.lineWidth = 0.12;
     for (let k = 0; k <= 4; k++) { c.beginPath(); c.moveTo(STEPS.x0, STEPS.z0 + k * 0.3); c.lineTo(STEPS.x1, STEPS.z0 + k * 0.3); c.stroke(); }
     c.fillStyle = P.bld; c.lineWidth = 0.5;
-    c.fillRect(BLD.x0, BLD.z0, 80, 60); c.strokeRect(BLD.x0, BLD.z0, 80, 60);
+    c.fillRect(BLD.x0, BLD.z0, BLD.x1-BLD.x0, BLD.z1-BLD.z0); c.strokeRect(BLD.x0, BLD.z0, BLD.x1-BLD.x0, BLD.z1-BLD.z0);
     c.fillStyle = P.pav; c.fillRect(PAV.x0, PAV.z0, 5, 11); c.fillRect(5, PAV.z0, 5, 11);
     c.fillStyle = P.bld; c.fillRect(-5, PAV.z0 - 0.3, 10, 11.3);
     c.strokeRect(PAV.x0, PAV.z0, 20, 11);
-    c.fillStyle = P.hall; c.fillRect(HALL.x0, HALL.z0, 56, 36);
+    c.fillStyle = P.hall; c.fillRect(HALL.x0, HALL.z0, HALL.x1-HALL.x0, HALL.z1-HALL.z0);
     world.rooms.forEach(r => {
       const ex = r.exhibit, i = ex ? ex.index : -1;
       c.fillStyle = r.type ? P.svc : (o.hover === i ? P.hover : (o.visited && o.visited[i] ? P.seen : P.room));
@@ -4608,7 +4657,7 @@ CFT.loadModels = onProgress => {
           c.fillStyle = P.badge; c.strokeStyle = ink; c.lineWidth = 0.25;
           c.beginPath(); c.arc(r.cx, r.cz - 3.6, 1.3, 0, Math.PI * 2); c.fill(); c.stroke();
           c.fillStyle = ink; c.font = `1.6px ${FONT.mono}`; c.fillText(String(i + 1), r.cx, r.cz - 3.05);
-          c.font = `1.9px ${FONT.body}`; c.fillText(ex.data.name, r.cx, r.cz + 3.6);
+          c.font = `1.9px ${FONT.body}`; c.fillText(ex.data.name, r.cx, r.cz + 3.6, r.x1-r.x0-1.2);
           if (ex.data.bonus) { c.font = `1.2px ${FONT.mono}`; c.fillText('EXPANSION', r.cx, r.cz + 5.1); }
           if (o.visited && o.visited[i]) { c.font = `1.4px ${FONT.mono}`; c.fillText('✓ VISITED', r.cx, r.cz - 1.2); }
         }
@@ -4815,6 +4864,7 @@ CFT.loadModels = onProgress => {
     renderMotion(ex);
     renderPatterns(ex);
     $('info-showcase').onclick = () => G().showcase(ex);
+    $('info-showcase').hidden = !!ex.data.pendingModel;
     $('info-tabs').innerHTML = CFT.TABS.map((t, i) =>
       `<button class="tab" role="tab" data-i="${i}" aria-selected="false"><span class="tab-dot" aria-hidden="true"></span>${t.label}</button>`).join('');
     $('info-tabs').querySelectorAll('.tab').forEach(b => { b.onclick = () => showTab(+b.dataset.i); });
@@ -4895,13 +4945,15 @@ CFT.loadModels = onProgress => {
     tabIndex = (i + CFT.TABS.length) % CFT.TABS.length;
     const ex = current, d = ex.data, id = CFT.TABS[tabIndex].id, body = $('info-body');
     body.scrollTop = 0;
-    if (id === 'overview') {
+    if (d.pendingModel && id !== 'overview' && id !== 'engineering') {
+      body.innerHTML = '<p class="lede">This project hall is ready. The source model, animation and specifications are coming soon.</p>';
+    } else if (id === 'overview') {
       body.innerHTML = `${d.overview.map(p => `<p class="lede">${p}</p>`).join('')}
         <dl class="label-card">
           <div><dt>Catalogue</dt><dd>${code(ex)}</dd></div>
           <div><dt>Location</dt><dd>${ex.hall}</dd></div>
           <div><dt>Date</dt><dd>Kinetic installation, ${d.year}</dd></div>
-          <div><dt>Dimensions</dt><dd class="num">${dims(ex.size)}</dd></div>
+          <div><dt>Dimensions</dt><dd class="num">${d.pendingModel ? 'Awaiting source drawing' : dims(ex.size)}</dd></div>
           <div class="wide"><dt>Materials</dt><dd>${d.materials}</dd></div>
           <div class="wide"><dt>Made by Craftech360</dt><dd><div class="cft-links">${linksHTML()}</div></dd></div>
         </dl>`;
@@ -4910,13 +4962,14 @@ CFT.loadModels = onProgress => {
     } else if (id === 'engineering') {
       // The team's own line drawing first (shown as a cyan hologram), then the live elevation of the model.
       const dr = CFT.DRAWINGS && CFT.DRAWINGS[d.id];
-      body.innerHTML = `${dr ? `<figure class="drawing"><button class="drawing-btn" id="dr-open" aria-label="Enlarge the line drawing"><img src="${dr}" alt="Line drawing of ${d.name} by the Craftech360 engineering team"></button>
-          <figcaption><span>Line drawing · Craftech360 engineering · click to enlarge</span></figcaption></figure>` : ''}
-        <figure class="blueprint"><canvas id="bp-canvas" width="880" height="540" aria-label="Engineering elevation of ${d.name}"></canvas></figure>
+      const pages = (CFT.DRAWING_PAGES && CFT.DRAWING_PAGES[d.id]) || (dr ? [dr] : []);
+      body.innerHTML = `${pages.map((src,k) => `<figure class="drawing"><button class="drawing-btn" data-drawing-page="${k}" aria-label="Enlarge drawing page ${k+1}"><img loading="lazy" src="${src}" alt="${d.name} engineering reference, page ${k+1}"></button>
+          <figcaption><span>Engineering reference · page ${k+1} of ${pages.length} · click to enlarge</span></figcaption></figure>`).join('')}
+        ${d.pendingModel ? '<p class="note">Model elevation coming soon.</p>' : `<figure class="blueprint"><canvas id="bp-canvas" width="880" height="540" aria-label="Engineering elevation of ${d.name}"></canvas></figure>`}
         <p class="body-text">${d.engineering.text}</p>
         <ul class="callouts">${d.engineering.callouts.map(c => `<li>${c}</li>`).join('')}</ul>`;
-      drawBlueprint($('bp-canvas'), ex);
-      if (dr) $('dr-open').onclick = () => openLightbox(dr);
+      if (!d.pendingModel) drawBlueprint($('bp-canvas'), ex);
+      body.querySelectorAll('[data-drawing-page]').forEach(button => { button.onclick = () => openLightbox(pages[+button.dataset.drawingPage]); });
     } else if (id === 'gallery') {
       const plates = ['Three-quarter view, left', 'Three-quarter view, right', 'Low angle, looking up', 'High angle, from above'];
       body.innerHTML = `<div class="gallery">${plates.map((p, k) =>
@@ -5013,17 +5066,31 @@ CFT.loadModels = onProgress => {
     const ex = byId(id), P = G().state.progress;
     return `<li><button class="hall-row" data-i="${ex.index}" style="--hall:${ex.data.accent}">
       <span class="swatch" aria-hidden="true"></span>
-      <span class="hall-name">${ex.data.name}<small>${ex.hall}</small></span>
-      <span class="hall-state">${P.visited[ex.index] ? 'Visited' : 'Go'}</span></button></li>`;
+      <span class="hall-name">${ex.data.name}<small>${ex.hall} · ${ex.data.wing} Wing</small></span>
+      <span class="hall-state">${ex.data.pendingModel ? 'Coming soon' : P.visited[ex.index] ? 'Visited' : 'Go'}</span></button></li>`;
   }
   function openMap() {
     mapState.active = true; mapState.hover = -1;
-    $('map-list').innerHTML = CFT.ROUTE.map(hallRow).join('') + '<li class="list-label">Expansion halls</li>' + bonusIds().map(hallRow).join('');
+    $('map-list').innerHTML = CFT.COLLECTION.wings.map((wing, i) => '<li class="list-label">'+wing.name+' Wing · '+wing.label+'</li>'+CFT.ROUTE.slice(i*9,i*9+9).map(hallRow).join('')).join('');
     $('map-list').querySelectorAll('.hall-row').forEach(b => {
       b.onclick = () => jump(+b.dataset.i);
       b.onmouseenter = () => { mapState.hover = +b.dataset.i; mapPreview(mapState.hover); };
       b.onmouseleave = () => { mapState.hover = -1; mapPreview(-1); };
     });
+    $('map-search').value = '';
+    $('map-search-status').hidden = true;
+    $('map-search').oninput = () => {
+      const query = $('map-search').value.trim().toLowerCase();
+      let count = 0;
+      $('map-list').querySelectorAll('.hall-row').forEach(b => {
+        const ex = G().world.exhibits[+b.dataset.i];
+        const match = !query || (ex.data.name+' '+ex.hall+' '+ex.data.wing).toLowerCase().includes(query);
+        b.parentElement.hidden = !match; if (match) count++;
+      });
+      $('map-list').querySelectorAll('.list-label').forEach(label => { label.hidden = !!query; });
+      $('map-search-status').hidden = !query;
+      $('map-search-status').textContent = count ? count+' matching project'+(count===1?'':'s') : 'No matching projects';
+    };
     open('map');
     mapPreview(-1);
     drawMapNow();
@@ -5096,7 +5163,7 @@ CFT.loadModels = onProgress => {
   function journalRow(id) {
     const P = G().state.progress, e = byId(id), i = e.index;
     return `<tr style="--hall:${e.data.accent}"><th scope="row"><span class="swatch" aria-hidden="true"></span>${e.data.name}${e.data.bonus ? '<span class="tag-small">Expansion</span>' : ''}<small>${e.hall}</small></th>
-      <td>${mark(P.visited[i])}</td><td>${mark(P.watched[i])}</td><td>${mark(P.learned[i])}</td><td>${mark(P.diagram[i])}</td><td>${mark(P.video[i])}</td>
+      ${['visited','watched','learned','diagram','video'].map(k => `<td>${CFT.activityAvailable(e.data,k) ? mark(P[k][i]) : '<span title="Content coming soon">—</span>'}</td>`).join('')}
       <td class="num">${P.tabs[i].length}/6</td>
       <td><button class="fav ${P.favorite === i ? 'on' : ''}" data-i="${i}" aria-pressed="${P.favorite === i}" aria-label="Mark ${e.data.name} as favourite">★</button></td></tr>`;
   }
@@ -5105,13 +5172,13 @@ CFT.loadModels = onProgress => {
     const count = arr => R.filter(i => arr[i]).length;
     const objectives = [
       ['Explore all selected kinetic installations', count(P.visited), n],
-      ['Learn about each installation', count(P.learned), n],
-      ['Watch kinetic animations', count(P.watched), n],
-      ['View engineering diagrams', count(P.diagram), n],
-      ['Watch demonstration videos', count(P.video), n],
+      ...[['Learn about available installations','learned'], ['Watch available kinetic animations','watched'], ['View available engineering diagrams','diagram'], ['Watch available demonstration videos','video']].map(([label,k]) => {
+        const eligible = R.filter(i => CFT.activityAvailable(CFT.EXHIBITS[i], k));
+        return [label, eligible.filter(i => P[k][i]).length, eligible.length];
+      }),
       ['Complete the tour', P.tourComplete ? 1 : 0, 1],
       ['Unlock the tour completion summary', P.summaryShown ? 1 : 0, 1],
-      ['Visit the expansion halls (optional)', g.bonusVisited(), g.BONUS.length]
+      ['Explore all three wings', new Set(g.world.exhibits.filter(ex => P.visited[ex.index]).map(ex => ex.data.wing)).size, 3]
     ];
     $('journal-body').innerHTML = `
       <div class="stat-row">
@@ -5967,7 +6034,7 @@ CFT.loadModels = onProgress => {
     return;
   }
   const T = THREE, UI = () => CFT.UI, A = CFT.Audio;
-  const SAVE_KEY = 'cft-kinetic-museum-v2';
+  const SAVE_KEY = 'cft-kinetic-museum-v3-27';
   const EYE = 1.65, WALK = 3.4, RUN = 6.4, GRAV = 15, JUMP_V = 5.2;
   const EX = CFT.EXHIBITS, N = EX.length, REQ = [], BONUS = [];
   EX.forEach((e, i) => (e.bonus ? BONUS : REQ).push(i));
@@ -6181,15 +6248,18 @@ CFT.loadModels = onProgress => {
 
   // ---------------------------------------------------------------- Save + progress
   G.save = function () {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 2, progress: G.state.progress, settings: G.state.settings })); } catch (e) { /* storage unavailable */ }
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 3, progress: G.state.progress, settings: G.state.settings })); } catch (e) { /* storage unavailable */ }
   };
   const P = () => G.state.progress;
   const allReq = arr => REQ.every(i => arr[i]);
   G.requiredVisited = () => REQ.filter(i => P().visited[i]).length;
   G.bonusVisited = () => BONUS.filter(i => P().visited[i]).length;
   G.completionPct = function () {
-    const p = P(), n = ['visited', 'watched', 'learned', 'diagram', 'video'].reduce((s, k) => s + REQ.filter(i => p[k][i]).length, 0);
-    return Math.round(n / (5 * REQ.length) * 100);
+    const p = P(); let done = 0, total = 0;
+    ['visited','watched','learned','diagram','video'].forEach(k => REQ.forEach(i => {
+      if (CFT.activityAvailable(EX[i], k)) { total++; if (p[k][i]) done++; }
+    }));
+    return total ? Math.round(done / total * 100) : 0;
   };
   G.formatTime = function (sec) {
     sec = Math.floor(sec);
@@ -6230,15 +6300,18 @@ CFT.loadModels = onProgress => {
   G.markTab = function (ex, id) {
     const p = P(), i = ex.index, t = p.tabs[i];
     if (!t.includes(id)) t.push(id);
-    if (id === 'overview') p.learned[i] = true;
-    if (id === 'engineering') { p.diagram[i] = true; if (allReq(p.diagram)) G.award('engineer'); }
-    if (REQ.every(k => p.tabs[k].length >= CFT.TABS.length)) G.award('curator');
+    if (id === 'overview' && !ex.data.pendingModel) p.learned[i] = true;
+    if (id === 'engineering' && CFT.activityAvailable(ex.data, 'diagram')) {
+      p.diagram[i] = true;
+      if (REQ.filter(k => CFT.activityAvailable(EX[k], 'diagram')).every(k => p.diagram[k])) G.award('engineer');
+    }
+    if (REQ.filter(k => !EX[k].pendingModel).every(k => p.tabs[k].length >= CFT.TABS.length)) G.award('curator');
     G.save();
   };
   G.markVideo = function (ex) {
     const p = P();
     if (!p.video[ex.index]) { p.video[ex.index] = true; UI().toast('Demonstration watched', ex.data.name); }
-    if (allReq(p.video)) G.award('screening');
+    if (REQ.filter(k => !EX[k].pendingModel).every(k => p.video[k])) G.award('screening');
     G.save();
   };
   G.setMode = function (mode) { P().mode = mode; updateBeacon(); G.save(); };
@@ -6372,7 +6445,7 @@ CFT.loadModels = onProgress => {
   });
 
   window.addEventListener('keydown', e => {
-    if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'text') return; // typing a screen message
+    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && e.code !== 'Escape') return;
     if (e.code === 'Tab') e.preventDefault();
     if (G.phase === 'loading' || G.phase === 'title') return;
     if (G.phase === 'cinematic') {
@@ -6550,7 +6623,7 @@ CFT.loadModels = onProgress => {
   G.teleportTo = function (ex, viaMap) {
     const t = G.world.teleportPoint(ex);
     placePlayer(t.x, G.world.FLOOR, t.z, t.yaw, 0.12);
-    if (viaMap) { G.award('wayfinder'); UI().toast(`Arrived at ${ex.data.name}`, 'Press E to bring it to life.'); }
+    if (viaMap) { G.award('wayfinder'); UI().toast(`Arrived at ${ex.data.name}`, ex.data.pendingModel ? 'Press E for project details and available drawings.' : 'Press E to bring it to life.'); }
   };
 
   // ---------------------------------------------------------------- Interaction
@@ -6585,6 +6658,7 @@ CFT.loadModels = onProgress => {
       return;
     }
     const ex = f.ex;
+    if (ex.data.pendingModel) { markVisited(ex); UI().openInfo(ex); return; }
     if (!ex.activated) {
       ex.activated = true;
       markVisited(ex);
@@ -6638,7 +6712,7 @@ CFT.loadModels = onProgress => {
       ex.target = ((ex.activated && here) || panelEx === ex) ? 1 : (here ? 0.18 : 0.12);
       if (ex.energy > 0.85 && (here || panelEx === ex)) {
         ex.activeTime += dt;
-        if (ex.activeTime > 8 && !pr.watched[ex.index]) { pr.watched[ex.index] = true; G.save(); }
+        if (!ex.data.pendingModel && ex.activeTime > 8 && !pr.watched[ex.index]) { pr.watched[ex.index] = true; G.save(); }
         if (ex.activeTime > 60) G.award('lingerer');
       }
     });
@@ -6755,6 +6829,7 @@ CFT.loadModels = onProgress => {
   }
   G.showcase = function (ex) {
     if (!ex) return;
+    if (ex.data.pendingModel) { markVisited(ex); UI().openInfo(ex); return; }
     UI().closeAll(true);
     G.teleportTo(ex);
     Object.assign(show, { ex, t: 0, shown: -1, caps: showCaptions(ex) });

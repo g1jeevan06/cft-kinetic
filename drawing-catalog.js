@@ -1,0 +1,3 @@
+// Engineering references imported from the CFT source drawings.
+CFT.DRAWING_PAGES = {"tri-block-v1": ["drawings/tri-block-v1-1.jpg"], "tri-block-v2": ["drawings/tri-block-v2-1.jpg"], "nova-with-holo-fan": ["drawings/nova-with-holo-fan-1.jpg"], "sliding-dna-with-nova-bot": ["drawings/sliding-dna-with-nova-bot-1.jpg"], "tri-helix": ["drawings/tri-helix-1.jpg", "drawings/tri-helix-2.jpg"], "aurora": ["drawings/aurora-1.jpg"], "nebula": ["drawings/nebula-1.jpg"], "l-hmrs": ["drawings/l-hmrs-1.jpg", "drawings/l-hmrs-2.jpg", "drawings/l-hmrs-3.jpg"]};
+Object.entries(CFT.DRAWING_PAGES).forEach(([id,pages]) => { CFT.DRAWINGS[id] = pages[0]; });
