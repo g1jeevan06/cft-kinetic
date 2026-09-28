@@ -4314,7 +4314,9 @@ CFT.loadModels = onProgress => {
       // The stage follows the installation's footprint (as on its line drawing): long installations stand on a
       // rectangular stage, compact ones on a round plinth. Measurement lines on the floor give the drawing's sizes.
       ex.sourceSize = Object.assign({},ex.size);
-      const fit = r.central ? Math.min(3,3.8/ex.size.w,3.8/ex.size.d,7.8/ex.size.h,1.8/ex.radius) : Math.min(1,2.4/ex.size.w,2.4/ex.size.d,2.65/ex.size.h,1.25/ex.radius);
+      // Fit every source to the same visual bay envelope. Smaller exports are enlarged so they do not
+      // disappear on their plinth, while wide/tall exports keep their original proportions and stay inside it.
+      const fit = r.central ? Math.min(3,3.8/ex.size.w,3.8/ex.size.d,7.8/ex.size.h,1.8/ex.radius) : Math.min(2.2,2.4/ex.size.w,2.4/ex.size.d,2.65/ex.size.h,1.25/ex.radius);
       const modelGroup=ex.group; modelGroup.scale.multiplyScalar(fit);
       ex.group=new T.Group();ex.group.add(modelGroup);
       ex.size={w:ex.size.w*fit,h:ex.size.h*fit,d:ex.size.d*fit};ex.radius*=fit;ex.displayScale=fit;
@@ -5924,7 +5926,7 @@ CFT.loadModels = onProgress => {
   const turn = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; };
 
   CFT.People = function (scene, world) {
-    const people = { guideOn: true };
+    const people = { guideOn: false };
     const FLOOR = world.FLOOR;
 
     // ------------------------------------------------ The visitor's own body, seen in the third-person view
@@ -6119,7 +6121,7 @@ CFT.loadModels = onProgress => {
   const G = CFT.G = {
     state: {
       progress: freshProgress(),
-      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true, view: 'first', guide: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.sunsetSky ? { sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true } : null)
+      settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true, view: 'first', guide: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.sunsetSky ? { sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true } : null, { guide: false })
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     // Start inside the atrium so the first playable view immediately presents the three-tier museum.
