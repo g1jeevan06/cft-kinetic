@@ -379,6 +379,9 @@
   @keyframes fx-scan { from { top: 100%; } to { top: -4%; } }
   .kbd { border-radius: 0; }
   .modal { background: radial-gradient(ellipse at 50% 40%, rgba(6, 30, 46, 0.55), rgba(1, 4, 8, 0.86)); }
+  #architecture-board { background: rgba(1, 5, 10, 0.94); padding: 18px; }
+  .architecture-board-sheet { width: min(1500px, 96vw); height: min(92vh, 900px); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .architecture-board-image { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; background: #02070D; border: 1px solid var(--rule); }
   .sheet { background: var(--scan), linear-gradient(160deg, rgba(12, 34, 50, 0.97), rgba(3, 9, 15, 0.97) 60%); border: 1px solid var(--rule); border-radius: 0; box-shadow: 0 0 50px rgba(254, 204, 0, 0.14), inset 0 0 80px rgba(254, 204, 0, 0.05); }
   .sheet:not(.info) { clip-path: var(--cut); }
   .sheet h2, #info-title { text-transform: uppercase; letter-spacing: 0.04em; text-shadow: 0 0 18px rgba(254, 204, 0, 0.35); }
@@ -536,6 +539,7 @@
   <div class="title-actions">
     <button class="btn btn-white btn-animated" id="btn-start">Start tour</button>
     <button class="btn" id="btn-free">Explore freely</button>
+    <button class="btn" id="btn-board">Architecture board</button>
     <button class="btn" id="btn-continue" hidden>Continue tour</button>
     <p id="halls-wait" hidden>Preparing the halls&hellip;<span id="halls-count"></span></p>
   </div>
@@ -547,6 +551,13 @@
       <p class="title-note">Best with a keyboard and mouse. Sound and narration are on — adjust them from the pause menu.</p></div>
   </div>
 </section>
+
+<div id="architecture-board" class="overlay modal" hidden role="dialog" aria-labelledby="architecture-board-title">
+  <div class="sheet architecture-board-sheet">
+    <div class="sheet-head"><div><div class="eyebrow">CFT Kinetic Museum</div><h2 id="architecture-board-title">Architectural Blueprint &amp; Layout</h2></div><div class="sheet-nav"><button class="close-btn" id="architecture-board-close">&#8592; Back</button></div></div>
+    <img class="architecture-board-image" src="images/CFT-Kinetic-architectural-blueprint-board.png" alt="CFT Kinetic Museum architectural blueprint and layout presentation board">
+  </div>
+</div>
 
 <div id="cine" hidden>
   <div id="cine-caption"></div>
@@ -5318,6 +5329,7 @@ CFT.loadModels = onProgress => {
 
   // ---------------------------------------------------------------- Route choice, museum info
   function openRoute() { open('route'); }
+  function openArchitectureBoard() { open('architecture-board'); }
   // Craftech360 showreel (YouTube), shown when a visitor first reaches the lobby globe and from the globe's menu.
   const SHOWREEL = 'https://www.youtube-nocookie.com/embed/628GTDHJQTk?autoplay=1&rel=0&modestbranding=1&playsinline=1';
   // The showreel video file next to the page (showreel/showreel.mp4) plays first: a plain <video> works online and
@@ -5460,6 +5472,8 @@ CFT.loadModels = onProgress => {
   CFT.UI = {
     init() {
       bindPause(); bindRoute();
+      $('btn-board').onclick = () => openArchitectureBoard();
+      $('architecture-board-close').onclick = () => closeTop();
       // Home is on every sheet; Back is the sheet's own close button.
       document.querySelectorAll('[data-home]').forEach(b => { b.onclick = () => G().goHome(); });
       $('info-close').onclick = () => closeTop();
@@ -5484,7 +5498,7 @@ CFT.loadModels = onProgress => {
       $('controls-pause').innerHTML = controlsTable();
       updateProgress();
     },
-    openInfo, openMap, openJournal, openPause, openRoute, openShowreel, openMuseumInfo, openCompany, showSummary, showCredits, showExit,
+    openInfo, openMap, openJournal, openPause, openRoute, openShowreel, openMuseumInfo, openCompany, openArchitectureBoard, showSummary, showCredits, showExit,
     closeTop, closeAll, anyOpen: () => stack.length > 0, isOpen: id => stack.includes(id),
     currentExhibit: () => current, cyclePattern, cycleMotion, toast, subtitle, say, tick, drawMap: drawMapNow, updateProgress, onKey, refreshTabDots
   };
