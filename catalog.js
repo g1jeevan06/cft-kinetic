@@ -48,7 +48,7 @@
   CFT.NARRATION.complete = 'You have explored all twenty-seven project halls. Return to the central lobby to see your tour summary.';
   CFT.ACHIEVEMENTS.forEach(a => { a.text = a.text.replace('all nine tour installations', 'all available installations'); });
   CFT.MUSEUM_INFO.layout = 'Twenty-seven numbered halls form three wings around a central exhibition promenade. The West Wing contains halls 01–09, the North Wing 10–18, and the East Wing 19–27.';
-  CFT.MUSEUM_INFO.dimensions = [['Main building', '164 × 132 m'], ['Main ceiling', '7 m'], ['Project halls', '27 across three wings'], ['Central lobby', '25 m diameter'], ['Hall entries', '3.2 m wide'], ['Entrance pavilion', '20 × 11 m']];
+  CFT.MUSEUM_INFO.dimensions = [['Main building', '164 × 132 m'], ['Main ceiling', '7 m'], ['Project halls', '27 across three wings'], ['Central lobby', '26 m square atrium with upper gallery'], ['Hall entries', '3.2 m wide'], ['Entrance pavilion', '20 × 11 m']];
   CFT.COLLECTION = { total: 27, version: 3, wings: [
     { name: 'West', label: '01—09', color: '#E9B44C' },
     { name: 'North', label: '10—18', color: '#6E8BFF' },

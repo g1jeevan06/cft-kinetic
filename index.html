@@ -514,7 +514,7 @@
   </div>
   <div class="title-foot">
     <div class="title-controls">
-      <p class="specline"><b>27</b> project halls · <b>3</b> exhibition wings · <b>164 × 132</b> m · <b>0</b> fail states</p>
+      <p class="specline"><b>27</b> projects · <b>2</b> atrium gallery floors · <b>14</b> downstairs · <b>13</b> upstairs</p>
       <p class="specline byline">Game design &amp; build by <b>CFT 3D Team</b></p>
       <div class="eyebrow">Controls</div><div id="controls-title"></div>
       <p class="title-note">Best with a keyboard and mouse. Sound and narration are on — adjust them from the pause menu.</p></div>
@@ -549,14 +549,14 @@
 
 <div id="route" class="overlay modal" hidden role="dialog" aria-labelledby="route-title">
   <div class="sheet">
-    <div class="sheet-head"><div><div class="eyebrow">Lobby globe</div><h2 id="route-title">How would you like to visit?</h2></div></div>
+    <div class="sheet-head"><div><div class="eyebrow">Atrium directory</div><h2 id="route-title">How would you like to visit?</h2></div></div>
     <div class="route-cards">
-      <button class="route-card rec" id="route-guided"><strong>Guided tour</strong><span>Visit all nine installations in the recommended order. The compass and a beam of light lead the way.</span><span class="tag">Recommended</span></button>
+      <button class="route-card rec" id="route-guided"><strong>Guided tour</strong><span>Visit all 27 project halls in the recommended order. The compass and a beam of light lead the way.</span><span class="tag">Recommended</span></button>
       <button class="route-card" id="route-free"><strong>Explore freely</strong><span>Wander the halls in any order. The map and your journal keep track of what you have seen.</span><span class="tag">Your own pace</span></button>
       <button class="route-card" id="route-jump"><strong>Jump to an installation</strong><span>Open the map and go straight to any hall.</span><span class="tag">Opens the map</span></button>
       <button class="route-card" id="route-showreel"><strong>Watch our showreel</strong><span>See Craftech360's installations and experiences in action.</span><span class="tag">YouTube</span></button>
     </div>
-    <p class="note">You can change this any time at the globe in the centre of the lobby.</p>
+    <p class="note">You can change this any time at the directory in the centre of the atrium.</p>
   </div>
 </div>
 
@@ -590,7 +590,7 @@
 
 <div id="map" class="overlay modal" hidden role="dialog" aria-labelledby="map-title">
   <div class="sheet map-sheet">
-    <div class="sheet-head"><div><div class="eyebrow">Floor plan · Ground level</div><h2 id="map-title">Map</h2></div><div class="sheet-nav"><button class="close-btn" data-home>&#8962; Home</button><button class="close-btn" id="map-close">&#8592; Back &middot; M</button></div></div>
+    <div class="sheet-head"><div><div class="eyebrow">Atrium plan · Select a floor</div><h2 id="map-title">Map</h2></div><div class="sheet-nav"><label>Floor <select id="map-level"><option value="0">Ground gallery</option><option value="1">Upper gallery</option></select></label><button class="close-btn" id="map-lobby">Lobby</button><button class="close-btn" data-home>&#8962; Home</button><button class="close-btn" id="map-close">&#8592; Back &middot; M</button></div></div>
     <canvas id="map-canvas" aria-label="Floor plan of the building. Click a hall to jump there."></canvas>
     <aside class="map-aside">
       <figure class="map-drawing" id="map-drawing" hidden><img alt=""><figcaption></figcaption></figure>
@@ -2677,6 +2677,8 @@ CFT.loadModels = onProgress => {
 
 </script>
 <script src="catalog-builders.js"></script>
+<script src="atrium.js"></script>
+<script src="gallery-layout.js"></script>
 <script>
 // CFT Kinetic — building, lighting, collision and floor plan.
 // Layout follows the CFT floor-plan boards: 80 × 60 m building, circular lobby, exhibition rooms on the
@@ -3267,7 +3269,7 @@ CFT.loadModels = onProgress => {
     D.pools.push({ x: 0, y: FLOOR + 0.012, z: 0, s: 5.5, c: WARM.clone().multiplyScalar(0.2) });
     world.anchors.push({ pos: V(0, GY, 0), color: new T.Color(0x9FD8FF), base: 0.7, range: 12 });
     world.colliders.push({ x: 0, z: 0, r: 2.55 });
-    world.kiosks.push({ id: 'desk', label: 'Lobby Globe', verb: 'Choose your route', pos: V(0, FLOOR + 1, 0), radius: 7.8 });
+    world.kiosks.push({ id: 'desk', label: 'Atrium Directory', verb: 'Choose your route', pos: V(0, FLOOR + 1, 0), radius: 7.8 });
   }
   function buildLounge(A, M, D, world, x, z) {
     A.add(new T.PlaneGeometry(5, 3.4), M.fabric, x, FLOOR + 0.008, z, 0, -Math.PI / 2);
@@ -3449,13 +3451,12 @@ CFT.loadModels = onProgress => {
   }
 
   function buildLobby(A, M, D, scene, world) {
-    // Atrium floor (the white-atrium reference): a band of hexagon paving between two glowing blue rings.
-    A.add(new T.RingGeometry(8.6, 10.9, 160, 1), M.hexFloor, 0, FLOOR + 0.009, 0, 0, -Math.PI / 2);
-    [8.52, 10.98].forEach(r => A.add(new T.TorusGeometry(r, 0.035, 6, 200), M.glowGold, 0, FLOOR + 0.02, 0, 0, Math.PI / 2));
-    A.add(new T.RingGeometry(LOBBY_R, LOBBY_R + 0.05, 160), M.glowWarm, 0, FLOOR + 0.009, 0, 0, -Math.PI / 2);
-    buildLobbyGlobe(A, M, D, scene, world);
-    buildAtriumDome(A, M, D, scene, world);
-    buildAtriumGarden(A, M, D, world);
+    const ab=new Geo.Batch(),ag=new T.Group(),cs=world.colliders.length,ks=world.kiosks.length,ls=world.anchors.length;
+    CFT.buildReferenceAtrium(ab,M,D,ag,world,T,Geo,FLOOR,TOP,canvasTexture,sign,FONT,plant);
+    ab.build(ag);ag.scale.set(CFT.ATRIUM_SCALE,1,CFT.ATRIUM_SCALE);scene.add(ag);
+    world.colliders.slice(cs).forEach(c=>{for(const k of ['x','z','x0','x1','z0','z1','r'])if(c[k]!==undefined)c[k]*=CFT.ATRIUM_SCALE;});
+    world.kiosks.slice(ks).forEach(k=>{k.pos.x*=CFT.ATRIUM_SCALE;k.pos.z*=CFT.ATRIUM_SCALE;k.radius*=CFT.ATRIUM_SCALE;});
+    world.anchors.slice(ls).forEach(k=>{k.pos.x*=CFT.ATRIUM_SCALE;k.pos.z*=CFT.ATRIUM_SCALE;});
     // Soft daylight pools round the atrium (no ceiling fittings: the dome is open above).
     for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2; D.pools.push({ x: Math.sin(a) * 10, y: FLOOR + 0.012, z: Math.cos(a) * 10, s: 3.2, c: WARM.clone().multiplyScalar(0.18) }); }
     [[-5.5, -5.5], [5.5, -5.5], [-5.5, 5.5], [5.5, 5.5]].forEach(([x, z]) => world.anchors.push({ pos: V(x, TOP - 1, z), color: WARM.clone(), base: 0.8, range: 16 }));
@@ -3464,7 +3465,7 @@ CFT.loadModels = onProgress => {
     for (let x = -26; x <= 26; x += 4) { downlight(D, x, -16, { size: 2.8 }); if (Math.abs(x) > 5) downlight(D, x, 16, { size: 2.8 }); }
     for (let z = -12; z <= 12; z += 4) { downlight(D, -26, z, { size: 2.8 }); downlight(D, 26, z, { size: 2.8 }); }
     [[-22, -12], [22, -12], [-22, 12], [22, 12], [0, -16], [-26, 0], [26, 0]].forEach(([x, z]) => world.anchors.push({ pos: V(x, TOP - 1, z), color: WARM.clone(), base: 0.6, range: 14 }));
-    [[-20, -9], [20, -9], [-20, 9], [20, 9]].forEach(([x, z]) => buildLounge(A, M, D, world, x, z));
+
 
     const face = (obj, x, z, tx, tz) => { obj.position.set(x, FLOOR, z); obj.rotation.y = Math.atan2(tx - x, tz - z); };
 
@@ -3773,7 +3774,7 @@ CFT.loadModels = onProgress => {
     A.slab(M.clad, BLD.x0, 0, BLD.z0, BLD.x0 + 0.3, BUILD_H, BLD.z1);
     A.slab(M.clad, BLD.x1 - 0.3, 0, BLD.z0, BLD.x1, BUILD_H, BLD.z1);
     // Roof slab with a square opening over the lobby for the atrium dome (buildAtriumDome closes the corners).
-    const HO = 13.2;
+    const HO = 13.2*CFT.ATRIUM_SCALE;
     A.slab(M.ceil, BLD.x0, TOP, BLD.z0, BLD.x1, BUILD_H, -HO); A.slab(M.ceil, BLD.x0, TOP, HO, BLD.x1, BUILD_H, BLD.z1);
     A.slab(M.ceil, BLD.x0, TOP, -HO, -HO, BUILD_H, HO); A.slab(M.ceil, HO, TOP, -HO, BLD.x1, BUILD_H, HO);
     [[BLD.x0, BLD.z0, BLD.x1, BLD.z0 + 0.2], [BLD.x0, BLD.z1 - 0.2, BLD.x1, BLD.z1], [BLD.x0, BLD.z0, BLD.x0 + 0.2, BLD.z1], [BLD.x1 - 0.2, BLD.z0, BLD.x1, BLD.z1]]
@@ -4297,9 +4298,14 @@ CFT.loadModels = onProgress => {
       const edgeMat = new T.MeshBasicMaterial({ color: accent.clone(), toneMapped: false });
       // The stage follows the installation's footprint (as on its line drawing): long installations stand on a
       // rectangular stage, compact ones on a round plinth. Measurement lines on the floor give the drawing's sizes.
+      ex.sourceSize = Object.assign({},ex.size);
+      const fit = Math.min(1,2.4/ex.size.w,2.4/ex.size.d,2.65/ex.size.h,1.25/ex.radius);
+      const modelGroup=ex.group; modelGroup.scale.multiplyScalar(fit);
+      ex.group=new T.Group();ex.group.add(modelGroup);
+      ex.size={w:ex.size.w*fit,h:ex.size.h*fit,d:ex.size.d*fit};ex.radius*=fit;ex.displayScale=fit;
       const s = ex.size, long = Math.max(s.w, s.d) > 2.5 && Math.max(s.w, s.d) > 1.6 * Math.min(s.w, s.d);
       if (long) {
-        const sw = s.w + 1.2, sd = s.d + 1.2;
+        const sw = s.w + 0.35, sd = s.d + 0.35;
         const stage = new T.Mesh(Geo.roundedBox(sw, 0.14, sd, 0.05), M.stone); stage.position.y = 0.07; stage.receiveShadow = true; ex.group.add(stage);
         [[sw, 0.03, 0.03, 0, sd / 2], [sw, 0.03, 0.03, 0, -sd / 2], [0.03, 0.03, sd, sw / 2, 0], [0.03, 0.03, sd, -sw / 2, 0]].forEach(([a, b, c, x, z]) => {
           const e = new T.Mesh(new T.BoxGeometry(a, b, c), edgeMat); e.position.set(x, 0.15, z); ex.group.add(e);
@@ -4313,7 +4319,7 @@ CFT.loadModels = onProgress => {
         edge.rotation.x = Math.PI / 2; edge.position.y = 0.14; ex.group.add(edge);
       }
       ex.edgeMat = edgeMat;
-      ex.pos = V(r.cx, FLOOR, r.cz);
+      ex.pos = V(r.cx, FLOOR+r.elevation, r.cz);
       ex.front = V(r.f[0], 0, r.f[1]);
       ex.group.position.copy(ex.pos);
       ex.group.rotation.y = Math.atan2(r.f[0], r.f[1]);
@@ -4321,16 +4327,23 @@ CFT.loadModels = onProgress => {
       ex.group.traverse(o => o.layers.enable(ex.layer));
       if (ex.stage) {
         const hx = (r.f[0] === 0 ? ex.stage.w : ex.stage.d) / 2 + 0.1, hz = (r.f[0] === 0 ? ex.stage.d : ex.stage.w) / 2 + 0.1;
-        world.colliders.push({ x0: r.cx - hx, x1: r.cx + hx, z0: r.cz - hz, z1: r.cz + hz });
-      } else world.colliders.push({ x: r.cx, z: r.cz, r: ex.radius + 0.25 });
+        world.colliders.push({ x0: r.cx - hx, x1: r.cx + hx, z0: r.cz - hz, z1: r.cz + hz, level:r.level });
+      } else world.colliders.push({ x: r.cx, z: r.cz, r: ex.radius + 0.15, level:r.level });
       scene.add(ex.group);
       world.exhibits.push(ex);
     });
 
       ROOMS.forEach(r => {
         if (!r.exhibit) return;
-        roomSign(scene, r, r.exhibit.index + 1, r.exhibit.data.name, r.exhibit.data.accent);
-        buildExhibitRoom(A, M, D, scene, world, r, r.exhibit);
+        const ex=r.exhibit;
+        const tx=canvasTexture(1024,192,(c,w,h)=>{
+          c.fillStyle='#101E28';c.fillRect(0,0,w,h);c.fillStyle=ex.data.accent;
+          c.font=`28px ${FONT.mono}`;c.fillText(`${ex.hall} / ${ex.data.floorName.toUpperCase()}`,35,50);
+          c.fillStyle='#FFFFFF';fitFont(c,ex.data.name,FONT.display,54,950);c.fillText(ex.data.name,35,130);
+        });
+        const panel=sign(3.2,0.6,tx,true);panel.position.set(r.cx-r.f[0]*1.55,FLOOR+r.elevation+3.05,r.cz-r.f[1]*1.55);
+        panel.rotation.y=Math.atan2(r.f[0],r.f[1]);scene.add(panel);
+        world.anchors.push({pos:V(r.cx,FLOOR+r.elevation+3.1,r.cz),color:new T.Color(ex.data.accent),base:0.35,range:5});
       });
       shadowed(A.build(scene));
       buildDecals(scene, TX, D);
@@ -4343,13 +4356,13 @@ CFT.loadModels = onProgress => {
     // Everything from here on draws without a single model, so it runs straight away.
     const hasExhibit = r => CFT.EXHIBITS.some(d => d.id === r.id);
     ROOMS.forEach(r => {
-      buildRoomShell(A, M, D, scene, r);
+      if (!r.openGallery) buildRoomShell(A, M, D, scene, r);
       if (hasExhibit(r)) return;
       if (r.type === 'cafe') { roomSign(scene, r, 0, 'Café', '#E0B366'); buildCafe(A, M, D, scene, world, r); }
       else roomSign(scene, r, 0, 'Restrooms', '#9AA4AD');
     });
     buildLobby(A, M, D, scene, world);
-    buildCollectionPromenade(A, M, D, scene, world);
+
     buildEntranceAndExterior(A, M, D, scene, world);
     buildGrandFacade(A, M, D, scene, world, TX);
     buildSea(A, M, D, scene, world, TX);
@@ -4460,8 +4473,9 @@ CFT.loadModels = onProgress => {
     };
 
     // ------------------------------------------------ Collision: returns floor height, or null if blocked
-    function collide(x, z) {
+    function collide(x, z, y = FLOOR) {
       for (const c of world.colliders) {
+        if(c.level!==undefined && c.level!==(y>FLOOR+3.8?1:0))continue;
         if (c.r !== undefined) { if ((x - c.x) * (x - c.x) + (z - c.z) * (z - c.z) < (c.r + PR) * (c.r + PR)) return true; }
         else if (x > c.x0 - PR && x < c.x1 + PR && z > c.z0 - PR && z < c.z1 + PR) return true;
       }
@@ -4470,8 +4484,10 @@ CFT.loadModels = onProgress => {
     function inFootprint(x, z, m) {
       return (x > BLD.x0 - m && x < BLD.x1 + m && z > BLD.z0 - m && z < BLD.z1 + m) || (x > PAV.x0 - m && x < PAV.x1 + m && z > PAV.z0 && z < PAV.z1 + m);
     }
-    world.floorAt = function (x, z) {
-      if (collide(x, z)) return null;
+    world.floorAt = function (x, z, y = FLOOR) {
+      const atrium = CFT.atriumHeight(x/CFT.ATRIUM_SCALE,z/CFT.ATRIUM_SCALE,y,FLOOR);
+      if (collide(x,z,y)) return null;
+      if (atrium !== undefined) return atrium;
       if (inRect(x, z, HALL, PR)) return FLOOR;
       if (x > -5 + PR && x < 5 - PR && z > HALL.z1 - 1 && z < DOOR_Z - 0.25) return FLOOR;
       for (const r of ROOMS) {
@@ -4486,10 +4502,10 @@ CFT.loadModels = onProgress => {
       return null;
     };
 
-    world.zoneAt = function (x, z) {
+    world.zoneAt = function (x, z, y = FLOOR) {
       const inside = (x > BLD.x0 && x < BLD.x1 && z > BLD.z0 && z < BLD.z1) || (x > -5 && x < 5 && z >= BLD.z1 && z <= PAV.z1);
       if (inside) {
-        const r = ROOMS.find(rr => x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
+        const r = ROOMS.find(rr => rr.level===(y>FLOOR+3.8?1:0) && x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
         if (r && r.exhibit) return { id: 'hall', name: `${r.exhibit.hall} · ${r.exhibit.data.name}`, exhibit: r.exhibit };
         if (r && r.type === 'cafe') return { id: 'cafe', name: 'Café', room: r };
         if (z > BLD.z1) return { id: 'entrance', name: 'Main Entrance' };
@@ -4504,6 +4520,10 @@ CFT.loadModels = onProgress => {
 
     // Waypoints from a position to an installation (or back to the lobby when ex is null).
     world.routeTo = function (from, zone, ex) {
+      if (CFT.galleryRoute && zone.id !== 'plaza' && zone.id !== 'entrance') {
+        const target=ex?Object.assign(world.teleportPoint(ex),{y:ex.pos.y}):{x:0,z:11.5,y:FLOOR};
+        return CFT.galleryRoute(from,target,world);
+      }
       const pts = [{ x: from.x, z: from.z }];
       const outside = r => ({ x: r.door.x + r.f[0] * 1.8, z: r.door.z + r.f[1] * 1.8 });
       if (zone.id === 'plaza') { if (from.z > PORCH.z1 || Math.abs(from.x) > PORCH.x1) pts.push({ x: 0, z: 47.6 }); pts.push({ x: 0, z: 38 }); }
@@ -4537,12 +4557,12 @@ CFT.loadModels = onProgress => {
       }
       return routed;
     };
-    world.pickAt = function (x, z) {
-      const r = ROOMS.find(rr => rr.exhibit && x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
+    world.pickAt = function (x, z, level=0) {
+      const r = ROOMS.find(rr => rr.exhibit && rr.level===level && x > rr.x0 && x < rr.x1 && z > rr.z0 && z < rr.z1);
       return r ? r.exhibit.index : -1;
     };
     world.teleportPoint = function (ex) {
-      const d = Math.min(ex.radius + 2.8, 5.0);
+      const d = ex.room.face==='+z' ? 1.8 : 2.2;
       return { x: ex.pos.x + ex.front.x * d, z: ex.pos.z + ex.front.z * d, yaw: Math.atan2(ex.front.x, ex.front.z) };
     };
 
@@ -4568,17 +4588,17 @@ CFT.loadModels = onProgress => {
         ex.edgeMat.color.set(ex.data.accent).multiplyScalar(0.25 + ex.energy * 0.9);
       });
       // Shadow spotlight: above the installation whose hall you are in (off in the lobby and outside).
-      const sl = world.shadowLight, here = world.exhibits.find(ex => inRect(eye.x, eye.z, ex.room, -0.5));
+      const sl = world.shadowLight, here = world.exhibits.find(ex => Math.abs(eye.y-ex.pos.y-1.7)<2 && inRect(eye.x, eye.z, ex.room, -0.5));
       if (here) {
         const s = here.size, f = here.front;
-        sl.position.set(here.pos.x + f.x * 2.2, TOP - 0.25, here.pos.z + f.z * 2.2);
+        sl.position.set(here.pos.x + f.x * 2.2, here.pos.y+3.4, here.pos.z + f.z * 2.2);
         sl.target.position.set(here.pos.x, here.pos.y + Math.min(s.h, 4) * 0.35, here.pos.z);
         sl.target.updateMatrixWorld();
         sl.intensity = 1.5 * (0.55 + 0.45 * here.energy);
         const sd = [f.z, -f.x], fz = Math.abs(f.x) < 0.5;
         areas.forEach((l, k) => {
           const po = (here.panelOff || 1.8) * (k ? 1 : -1);
-          l.position.set(here.pos.x + sd[0] * po, TOP - 0.08, here.pos.z + sd[1] * po);
+          l.position.set(here.pos.x + sd[0] * po, here.pos.y+3.3, here.pos.z + sd[1] * po);
           l.width = fz ? 0.5 : 5; l.height = fz ? 5 : 0.5;
           l.intensity = 4 * (0.6 + 0.4 * here.energy);
         });
@@ -4617,8 +4637,8 @@ CFT.loadModels = onProgress => {
   CFT.mapTransform = function (w, h) {
     // Plan content runs z -30 (back wall) to +50 (foot of the entrance steps) and x -40..40, so fit 84 x 84
     // and shift the centre down by the 10-unit offset between the two. #map-canvas carries the same 1:1 shape.
-    const s = Math.min(w / (BLD.x1 - BLD.x0 + 12), h / (50 - BLD.z0 + 12));
-    return { s, cx: w / 2, cy: h / 2 - (BLD.z0 + 50) / 2 * s };
+    const s = Math.min(w / 62, h / 82);
+    return { s, cx: w / 2, cy: h / 2 - 12 * s };
   };
   CFT.SKY_NAMES = { sunset: 'Sunset sea · golden hour', night: 'Night sea · stars', sea: 'Open sea · day', johannesburg: 'Johannesburg skyline · sunset', dusseldorf: 'Düsseldorf harbour · blue hour', shanghai: 'Shanghai Bund · night' };
 
@@ -4640,7 +4660,7 @@ CFT.loadModels = onProgress => {
     c.fillStyle = P.bld; c.fillRect(-5, PAV.z0 - 0.3, 10, 11.3);
     c.strokeRect(PAV.x0, PAV.z0, 20, 11);
     c.fillStyle = P.hall; c.fillRect(HALL.x0, HALL.z0, HALL.x1-HALL.x0, HALL.z1-HALL.z0);
-    world.rooms.forEach(r => {
+    world.rooms.filter(r=>r.level===(o.level||0)).forEach(r => {
       const ex = r.exhibit, i = ex ? ex.index : -1;
       c.fillStyle = r.type ? P.svc : (o.hover === i ? P.hover : (o.visited && o.visited[i] ? P.seen : P.room));
       c.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0);
@@ -4666,12 +4686,16 @@ CFT.loadModels = onProgress => {
       }
     });
     c.fillStyle = P.bld; c.strokeStyle = ink; c.lineWidth = 0.3;
-    c.beginPath(); c.arc(0, 0, LOBBY_R, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.rect(-20.64, -20.64, 41.28, 41.28); c.stroke();
     c.strokeStyle = P.core; c.lineWidth = 0.35; c.beginPath(); c.arc(0, 0, 2.4, 0, Math.PI * 2); c.stroke();
     c.fillStyle = P.core; c.beginPath(); c.arc(0, 0, 1.2, 0, Math.PI * 2); c.fill();
     c.fillStyle = P.col;
-    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + Math.PI / 8; c.beginPath(); c.arc(Math.sin(a) * 13.3, Math.cos(a) * 13.3, 0.45, 0, Math.PI * 2); c.fill(); }
+    [-11.8,11.8].forEach(x => [-11.8,11.8].forEach(z => c.fillRect(x-0.3,z-0.3,0.6,0.6)));
     c.fillStyle = P.lounge;
+    [-7,7].forEach(x => {
+      c.fillRect(x-1.25,0,2.5,9);
+      for(let z=0;z<9;z+=0.9){c.beginPath();c.moveTo(x-1.25,z);c.lineTo(x+1.25,z);c.stroke();}
+    });
     [[-20, -9], [20, -9], [-20, 9], [20, 9]].forEach(([x, z]) => c.fillRect(x - 2.5, z - 1.7, 5, 3.4));
     if (!o.compact) {
       c.fillStyle = ink; c.textAlign = 'center';
@@ -4681,7 +4705,7 @@ CFT.loadModels = onProgress => {
       c.fillStyle = P.info; c.beginPath(); c.arc(-6.8, 14.6, 0.9, 0, Math.PI * 2); c.fill();
       c.fillStyle = P.infoText; c.font = `1.3px ${FONT.body}`; c.fillText('i', -6.8, 15.05);
     }
-    if (o.route) {
+    if (o.route && o.route.length) {
       c.strokeStyle = P.route; c.lineWidth = 0.8; c.setLineDash([1.6, 1.2]);
       c.beginPath(); c.moveTo(o.route[0].x, o.route[0].z);
       o.route.slice(1).forEach(p => c.lineTo(p.x, p.z));
@@ -4951,9 +4975,9 @@ CFT.loadModels = onProgress => {
       body.innerHTML = `${d.overview.map(p => `<p class="lede">${p}</p>`).join('')}
         <dl class="label-card">
           <div><dt>Catalogue</dt><dd>${code(ex)}</dd></div>
-          <div><dt>Location</dt><dd>${ex.hall}</dd></div>
+          <div><dt>Location</dt><dd>${ex.hall} · ${d.floorName}</dd></div>
           <div><dt>Date</dt><dd>Kinetic installation, ${d.year}</dd></div>
-          <div><dt>Dimensions</dt><dd class="num">${d.pendingModel ? 'Awaiting source drawing' : dims(ex.size)}</dd></div>
+          <div><dt>Dimensions</dt><dd class="num">${d.pendingModel ? 'Awaiting source drawing' : dims(ex.sourceSize || ex.size)}${!d.pendingModel && ex.displayScale<1?'<small>Scaled gallery display; dimensions describe the full-size installation.</small>':''}</dd></div>
           <div class="wide"><dt>Materials</dt><dd>${d.materials}</dd></div>
           <div class="wide"><dt>Made by Craftech360</dt><dd><div class="cft-links">${linksHTML()}</div></dd></div>
         </dl>`;
@@ -4991,7 +5015,7 @@ CFT.loadModels = onProgress => {
       setupVideo(ex);
     } else {
       body.innerHTML = `<table class="specs"><tbody>${d.specs.map(r => `<tr><th scope="row">${r[0]}</th><td class="num">${r[1]}</td></tr>`).join('')}
-        <tr><th scope="row">Overall size</th><td class="num">${dims(ex.size)}</td></tr></tbody></table>
+        <tr><th scope="row">Overall size</th><td class="num">${dims(ex.sourceSize || ex.size)}</td></tr></tbody></table>
         <p class="note">Figures describe this web edition's model of the installation.</p>`;
     }
     G().markTab(ex, id);
@@ -5061,17 +5085,20 @@ CFT.loadModels = onProgress => {
   }
 
   // ---------------------------------------------------------------- Map
-  const mapState = { active: false, hover: -1 };
+  const mapState = { active: false, hover: -1, level:0 };
   function hallRow(id) {
     const ex = byId(id), P = G().state.progress;
     return `<li><button class="hall-row" data-i="${ex.index}" style="--hall:${ex.data.accent}">
       <span class="swatch" aria-hidden="true"></span>
-      <span class="hall-name">${ex.data.name}<small>${ex.hall} · ${ex.data.wing} Wing</small></span>
+      <span class="hall-name">${ex.data.name}<small>${ex.hall} · ${ex.data.floorName}</small></span>
       <span class="hall-state">${ex.data.pendingModel ? 'Coming soon' : P.visited[ex.index] ? 'Visited' : 'Go'}</span></button></li>`;
   }
   function openMap() {
     mapState.active = true; mapState.hover = -1;
-    $('map-list').innerHTML = CFT.COLLECTION.wings.map((wing, i) => '<li class="list-label">'+wing.name+' Wing · '+wing.label+'</li>'+CFT.ROUTE.slice(i*9,i*9+9).map(hallRow).join('')).join('');
+    mapState.level=G().player.pos.y>G().world.FLOOR+3.8?1:0;
+    $('map-level').value=String(mapState.level);
+    $('map-level').onchange=()=>{mapState.level=+$('map-level').value;drawMapNow();};
+    $('map-list').innerHTML = [0,1].map(level => '<li class="list-label">'+(level?'Upper gallery · 15–27':'Ground gallery · 01–14')+'</li>'+CFT.EXHIBITS.filter(e=>e.floorLevel===level).map(e=>hallRow(e.id)).join('')).join('');
     $('map-list').querySelectorAll('.hall-row').forEach(b => {
       b.onclick = () => jump(+b.dataset.i);
       b.onmouseenter = () => { mapState.hover = +b.dataset.i; mapPreview(mapState.hover); };
@@ -5084,7 +5111,7 @@ CFT.loadModels = onProgress => {
       let count = 0;
       $('map-list').querySelectorAll('.hall-row').forEach(b => {
         const ex = G().world.exhibits[+b.dataset.i];
-        const match = !query || (ex.data.name+' '+ex.hall+' '+ex.data.wing).toLowerCase().includes(query);
+        const match = !query || (ex.data.name+' '+ex.hall+' '+ex.data.floorName).toLowerCase().includes(query);
         b.parentElement.hidden = !match; if (match) count++;
       });
       $('map-list').querySelectorAll('.list-label').forEach(label => { label.hidden = !!query; });
@@ -5125,7 +5152,7 @@ CFT.loadModels = onProgress => {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.fillStyle = '#030A10'; c.fillRect(0, 0, w, h);
     CFT.drawMap(c, w, h, {
-      world: g.world, compact: true, dark: true, visited: g.state.progress.visited,
+      world: g.world, level:g.player.pos.y>g.world.FLOOR+3.8?1:0, compact: true, dark: true, visited: g.state.progress.visited,
       player: { x: g.player.pos.x, z: g.player.pos.z, yaw: g.player.yaw },
       route: g.guided() ? g.routePoints() : null
     });
@@ -5148,14 +5175,14 @@ CFT.loadModels = onProgress => {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.fillStyle = '#030A10'; c.fillRect(0, 0, w, h);
     CFT.drawMap(c, w, h, {
-      world: g.world, dark: true, visited: g.state.progress.visited, hover: mapState.hover,
+      world: g.world, level:mapState.level, dark: true, visited: g.state.progress.visited, hover: mapState.hover,
       player: { x: g.player.pos.x, z: g.player.pos.z, yaw: g.player.yaw },
       route: g.guided() ? g.routePoints() : null
     });
   }
   function mapPick(ev) {
     const { w, h } = mapCanvasSize(), r = $('map-canvas').getBoundingClientRect(), tf = CFT.mapTransform(w, h);
-    return G().world.pickAt((ev.clientX - r.left - tf.cx) / tf.s, (ev.clientY - r.top - tf.cy) / tf.s);
+    return G().world.pickAt((ev.clientX - r.left - tf.cx) / tf.s, (ev.clientY - r.top - tf.cy) / tf.s,mapState.level);
   }
 
   // ---------------------------------------------------------------- Journal
@@ -5398,6 +5425,7 @@ CFT.loadModels = onProgress => {
       document.querySelectorAll('[data-home]').forEach(b => { b.onclick = () => G().goHome(); });
       $('info-close').onclick = () => closeTop();
       $('map-close').onclick = () => closeTop();
+      $('map-lobby').onclick = () => { closeAll(true); G().returnToLobby(); G().resumePlay(); };
       $('journal-close').onclick = () => closeTop();
       $('info2-close').onclick = () => closeTop();
       $('company-close').onclick = () => closeTop();
@@ -5967,7 +5995,7 @@ CFT.loadModels = onProgress => {
         const want = d < 0.35 ? 0 : Math.min(6.2, 0.6 + d * 1.6);
         gd.speed += (want - gd.speed) * Math.min(1, dt * 5);
         if (gd.speed > 0.05 && d > 0.05) {
-          const step = Math.min(d, gd.speed * dt), nx = gd.pos.x + dx / d * step, nz = gd.pos.z + dz / d * step, fy = world.floorAt(nx, nz);
+          const step = Math.min(d, gd.speed * dt), nx = gd.pos.x + dx / d * step, nz = gd.pos.z + dz / d * step, fy = world.floorAt(nx, nz,gd.pos.y);
           if (fy !== null) { gd.pos.set(nx, fy, nz); gd.stuck = 0; moving = gd.speed; gd.heading = turn(gd.heading, Math.atan2(dx, dz), Math.min(1, dt * 8)); }
           else gd.stuck += dt;
         }
@@ -6387,7 +6415,7 @@ CFT.loadModels = onProgress => {
         for (let d = Math.ceil((walked - flow) / SPACING) * SPACING + flow - walked; d < L && n < MAX; d += SPACING) {
           const total = walked + d;
           if (total < 1.4) continue;   // keep the space right at the visitor's feet clear
-          const x = a.x + dx * d / L, z = a.z + dz * d / L, fy = G.world.floorAt(x, z);
+          const x = a.x + dx * d / L, z = a.z + dz * d / L, y=(a.y===undefined?G.world.FLOOR:a.y)+((b.y===undefined?G.world.FLOOR:b.y)-(a.y===undefined?G.world.FLOOR:a.y))*d/L, fy = G.world.floorAt(x, z,y);
           pos.set(x, (fy === null ? G.world.FLOOR : fy) + 0.025, z);
           m4.compose(pos, q, one); mesh.setMatrixAt(n++, m4);
         }
@@ -6445,7 +6473,7 @@ CFT.loadModels = onProgress => {
   });
 
   window.addEventListener('keydown', e => {
-    if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName) && e.code !== 'Escape') return;
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.code !== 'Escape') return;
     if (e.code === 'Tab') e.preventDefault();
     if (G.phase === 'loading' || G.phase === 'title') return;
     if (G.phase === 'cinematic') {
@@ -6556,11 +6584,11 @@ CFT.loadModels = onProgress => {
     const ox = p.pos.x, oz = p.pos.z;
     for (const a of tries) {
       const c = Math.cos(a), s = Math.sin(a);
-      const nx = ox + (p.vx * c - p.vz * s) * dt * c, nz = oz + (p.vx * s + p.vz * c) * dt * c, h = W(nx, nz);
+      const nx = ox + (p.vx * c - p.vz * s) * dt * c, nz = oz + (p.vx * s + p.vz * c) * dt * c, h = W(nx, nz, p.pos.y);
       if (h !== null && h - p.pos.y <= 0.36) { p.pos.x = nx; p.pos.z = nz; break; }
     }
     const moved = Math.hypot(p.pos.x - ox, p.pos.z - oz);
-    const g0 = W(p.pos.x, p.pos.z), gy = g0 === null ? p.pos.y : g0;
+    const g0 = W(p.pos.x, p.pos.z, p.pos.y), gy = g0 === null ? p.pos.y : g0;
     if (!p.onGround || p.vy > 0) {
       p.vy -= GRAV * dt; p.pos.y += p.vy * dt;
       if (p.pos.y <= gy) { if (p.vy < -3) A.step(); p.pos.y = gy; p.vy = 0; p.onGround = true; }
@@ -6589,7 +6617,7 @@ CFT.loadModels = onProgress => {
       return;
     }
     const cp = Math.cos(p.pitch), dx = -Math.sin(p.yaw) * cp, dy = Math.sin(p.pitch), dz = -Math.cos(p.yaw) * cp;
-    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw), w = G.world, zone = w.zoneAt(p.pos.x, p.pos.z), inside = zone.id !== 'plaza';
+    const rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw), w = G.world, zone = w.zoneAt(p.pos.x, p.pos.z,p.pos.y), inside = zone.id !== 'plaza';
     const room = zone.exhibit ? zone.exhibit.room : null;   // in a hall, the camera stays inside it (not out through the glass front)
     const at = d => ({ x: p.pos.x - dx * d + rx * TP_SIDE * d / TP_DIST, y: G.camY + 0.3 - dy * d, z: p.pos.z - dz * d + rz * TP_SIDE * d / TP_DIST });
     let free = 0.4;
@@ -6622,9 +6650,10 @@ CFT.loadModels = onProgress => {
   }
   G.teleportTo = function (ex, viaMap) {
     const t = G.world.teleportPoint(ex);
-    placePlayer(t.x, G.world.FLOOR, t.z, t.yaw, 0.12);
+    placePlayer(t.x, ex.pos.y, t.z, t.yaw, 0.12);
     if (viaMap) { G.award('wayfinder'); UI().toast(`Arrived at ${ex.data.name}`, ex.data.pendingModel ? 'Press E for project details and available drawings.' : 'Press E to bring it to life.'); }
   };
+  G.returnToLobby = function () { placePlayer(0, G.world.FLOOR, 11.5, 0, 0.23); };
 
   // ---------------------------------------------------------------- Interaction
   const fwd = new T.Vector3();
@@ -6681,7 +6710,7 @@ CFT.loadModels = onProgress => {
   const eyePos = new T.Vector3();
   function updateGame(dt) {
     const p = G.player, pr = P(), world = G.world;
-    const z = world.zoneAt(p.pos.x, p.pos.z);
+    const z = world.zoneAt(p.pos.x, p.pos.z,p.pos.y);
     if (z.name !== G.zone.name) $('zone-name').textContent = z.name;
     G.zone = z;
     if (G.phase === 'play' || G.phase === 'panel' || G.phase === 'overlay') pr.time += dt;
@@ -6784,7 +6813,7 @@ CFT.loadModels = onProgress => {
     t: 0, dur: 11,
     path: new T.CatmullRomCurve3([new T.Vector3(28, 16, 112), new T.Vector3(13, 7, 84), new T.Vector3(3, 2.6, 62), new T.Vector3(0, EYE, 54)]),
     look: new T.CatmullRomCurve3([new T.Vector3(0, 6, 41), new T.Vector3(0, 4.8, 41), new T.Vector3(0, 3.4, 40), new T.Vector3(0, EYE + 0.4, 40)]),
-    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Nine kinetic installations around one circular lobby.'], [7.4, 'The doors are opening. Welcome in.']],
+    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Twenty-seven projects. Two gallery floors. One kinetic atrium.'], [7.4, 'The doors are opening. Welcome in.']],
     shown: -1
   };
   const tmpLook = new T.Vector3();
