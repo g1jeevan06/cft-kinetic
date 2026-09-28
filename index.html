@@ -42,18 +42,25 @@
   .loading-mark { display: block; width: 72px; height: auto; margin: 0 auto; animation: breathe 2.4s ease-in-out infinite; }
   @keyframes breathe { 50% { opacity: 0.55; transform: scale(0.96); } }
   #title { position: fixed; inset: 0; z-index: 12; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: clamp(24px, 5vw, 64px); overflow: auto;
-    background: linear-gradient(90deg, rgba(9, 12, 16, 0.93) 0%, rgba(9, 12, 16, 0.72) 40%, rgba(9, 12, 16, 0) 74%); }
-  .title-main { max-width: 660px; }
+    background: radial-gradient(ellipse at 72% 42%, rgba(11, 46, 65, 0.24), transparent 48%), linear-gradient(90deg, rgba(2, 7, 11, 0.97) 0%, rgba(3, 10, 16, 0.88) 45%, rgba(3, 10, 16, 0.54) 78%, rgba(3, 10, 16, 0.82) 100%); }
+  .title-main { max-width: 760px; }
+  .title-main::before { content: 'WELCOME TO'; display: block; color: var(--signal); font: 500 15px var(--mono); letter-spacing: 0.46em; margin: 26px 0 14px; }
+  .title-main::after { content: 'A JOURNEY INTO MOTION, DESIGN AND INNOVATION'; display: block; color: var(--signal); font: 500 15px var(--mono); letter-spacing: 0.18em; margin-top: 20px; }
   .title-main .eyebrow { color: var(--hud-dim); }
-  .wordmark { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 7vw, 92px); line-height: 1.04; letter-spacing: -0.01em; margin: 18px 0 0; }
+  .wordmark { font-family: var(--display); font-weight: 400; font-size: clamp(40px, 6.4vw, 86px); line-height: 1.04; letter-spacing: -0.01em; margin: 18px 0 0; text-transform: uppercase; }
   .wordmark .brand { display: block; height: clamp(56px, 7vw, 96px); width: auto; margin-bottom: 0.3em; }
+  .welcome-copy { max-width: 54ch; color: #E4EBF0; font-size: 17px; line-height: 1.6; margin: 20px 0 0; }
+  .welcome-cards { display: grid; grid-template-columns: repeat(3, minmax(140px, 1fr)); gap: 12px; max-width: 700px; margin-top: 30px; }
+  .welcome-card { min-height: 112px; padding: 18px 18px 16px; border: 1px solid var(--rule); background: rgba(3, 14, 22, 0.7); box-shadow: inset 0 0 24px rgba(254, 204, 0, 0.035); }
+  .welcome-card strong { display: block; color: var(--signal); font: 500 14px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 9px; }
+  .welcome-card span { display: block; color: #C7D0D8; font-size: 13px; line-height: 1.45; }
   .title-actions { display: flex; flex-wrap: wrap; gap: 12px; }
   /* Shown while the installations' models are still arriving; the start buttons wait for them. */
   #halls-wait { flex-basis: 100%; margin: 0; font: 12px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--hud-dim); font-variant-numeric: tabular-nums; }
   #halls-count { margin-left: 8px; color: var(--signal); }
   .title-actions .btn[disabled] { opacity: 0.45; cursor: progress; }
   /* The start button sits out in the open plaza on the right, away from the wordmark column. */
-  #title > .title-actions { position: absolute; left: 62%; bottom: 16%; }
+  #title > .title-actions { position: absolute; left: clamp(24px, 5vw, 64px); bottom: 8%; }
   #title > .title-actions .btn { padding: 17px 30px; font-size: 15px; }
   .specline { font: 12px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--hud-dim); margin: 28px 0 0; font-variant-numeric: tabular-nums; }
   .specline b { color: var(--hud-text); font-weight: 500; }
@@ -77,6 +84,7 @@
     #title > .title-actions { position: static; margin-top: 26px; }
     #title > .cft-links { position: static; width: auto; margin: 22px 0 0; }   /* no room top right */
   }
+  @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } .welcome-card { min-height: auto; } .welcome-copy { font-size: 15px; } }
 
   /* HUD */
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
@@ -505,10 +513,17 @@
 <section id="title" hidden>
   <div class="title-main">
     <h1 class="wordmark"><img class="brand" data-logo="wordmark" alt="CFT">KINETIC</h1>
+    <p class="welcome-copy">Explore a world where engineering meets artistry. Experience interactive kinetic installations that move, inspire, and shape the future.</p>
+    <div class="welcome-cards" aria-label="Museum overview">
+      <div class="welcome-card"><strong>Discover</strong><span>Explore 27 interactive kinetic installations.</span></div>
+      <div class="welcome-card"><strong>Learn</strong><span>Understand the technology and creativity behind each motion.</span></div>
+      <div class="welcome-card"><strong>Experience</strong><span>Engage with motion, sound, light, and innovation.</span></div>
+    </div>
   </div>
   <div class="cft-links" data-links></div>
   <div class="title-actions">
-    <button class="btn btn-white btn-animated" id="btn-start">Begin the visit</button>
+    <button class="btn btn-white btn-animated" id="btn-start">Start tour</button>
+    <button class="btn" id="btn-free">Explore freely</button>
     <button class="btn" id="btn-continue" hidden>Continue tour</button>
     <p id="halls-wait" hidden>Preparing the halls&hellip;<span id="halls-count"></span></p>
   </div>
@@ -6913,6 +6928,7 @@ CFT.loadModels = onProgress => {
   function hallsReady() { hallsBuilt = true; gateStart(); }
   function gateStart() {
     $('btn-start').disabled = !hallsBuilt;
+    $('btn-free').disabled = !hallsBuilt;
     $('btn-continue').disabled = !hallsBuilt;
     $('halls-wait').hidden = hallsBuilt;
   }
@@ -6958,6 +6974,19 @@ CFT.loadModels = onProgress => {
       fx.remove(); btn.classList.remove('launching'); btn.textContent = label; btn.style.width = '';
       $('title').classList.remove('leaving'); launching = false;
     }, 2050);
+  };
+  $('btn-free').onclick = () => {
+    if (!hallsBuilt) return;
+    A.init();
+    G.state.progress = freshProgress();
+    resetExhibits(); G.save(); UI().updateProgress(); updateBeacon();
+    $('title').hidden = true; $('hud').hidden = false;
+    placePlayer(0, G.world.FLOOR, 10, 0, 0.12);
+    G.zone = G.world.zoneAt(0, 10);
+    $('zone-name').textContent = G.zone.name;
+    G.setPhase('play');
+    G.resumePlay();
+    UI().toast('Explore freely', 'Use the map or walk to any of the 27 installations.');
   };
   $('btn-continue').onclick = () => {
     A.init();
