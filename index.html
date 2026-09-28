@@ -81,8 +81,20 @@
   @media (max-width: 760px) { .title-controls .controls tbody { grid-template-columns: repeat(2, auto); } }
   /* Too narrow or too short for the plaza placement: put the start button back under the wordmark. */
   @media (max-width: 900px), (max-height: 560px) {
-    #title > .title-actions { position: static; margin-top: 26px; }
-    #title > .cft-links { position: static; width: auto; margin: 22px 0 0; }   /* no room top right */
+    #title > .title-actions { position: absolute; left: 18px; right: 18px; bottom: 18px; justify-content: center; margin-top: 0; }
+    #title > .cft-links { position: absolute; top: 12px; right: 18px; width: auto; margin: 0; }   /* keep the compact title clean */
+  }
+  @media (max-height: 560px) {
+    #title { justify-content: flex-start; gap: 8px; padding: 18px; overflow: hidden; }
+    #title > .title-foot { display: none; }
+    .title-main { max-width: 100%; }
+    .title-main::before { margin: 2px 0 8px; font-size: 11px; }
+    .title-main::after { display: none; }
+    .wordmark { font-size: clamp(32px, 6vw, 54px); margin-top: 8px; }
+    .wordmark .brand { height: 42px; margin-bottom: 0.15em; }
+    .welcome-copy { display: none; }
+    .welcome-cards { display: none; }
+    #title > .title-actions .btn { padding: 14px 22px; font-size: 13px; }
   }
   @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } .welcome-card { min-height: auto; } .welcome-copy { font-size: 15px; } }
 
