@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const read = name => fs.readFileSync(path.join(__dirname, name), 'utf8');
 const html = read('index.html');
+assert(html.includes('ControlLeft') && html.includes('CROUCH_EYE') && html.includes("['Ctrl', 'Crouch']"),'crouch control');
 const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 scripts.forEach((s,i) => new vm.Script(s, {filename:'inline-'+i}));
 const ctx = vm.createContext({}); ctx.window = ctx;

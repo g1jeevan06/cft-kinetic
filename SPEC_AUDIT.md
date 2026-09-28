@@ -19,7 +19,7 @@ Compared with the supplied project brief:
 ## Still missing or partial
 
 - Basement and Rooftop are now true walkable levels. The map exposes Basement, Floor 1, Floor 2, Upper and Rooftop, with service and visitor deck geometry plus side stair connections.
-- CTRL crouch is not implemented yet; C currently toggles first/third-person view.
+- CTRL crouch is implemented as a hold state on desktop, with a lower camera, reduced movement speed and reduced head-bob; C still toggles first/third-person view.
 - Gamepad input and WebXR/VR input are not implemented.
 - AR view, share action, playlist/video-quality controls, captions and presentation mode are not implemented.
 - Achievement XP/levels/progress bars and reward tiers are only a basic unlocked/locked journal state.

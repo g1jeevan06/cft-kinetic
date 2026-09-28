@@ -578,7 +578,7 @@
   <div id="touch-ui" aria-hidden="true">
     <div class="joy" id="joy"><div class="joy-knob" id="joy-knob"></div></div>
     <div class="touch-menu"><button class="tbtn pill" data-act="map">Map</button><button class="tbtn pill" data-act="journal">Journal</button><button class="tbtn pill" data-act="pause">Pause</button></div>
-    <div class="touch-actions"><button class="tbtn" data-act="run">Run</button><button class="tbtn big" data-act="interact">E</button><button class="tbtn" data-act="jump">Jump</button></div>
+    <div class="touch-actions"><button class="tbtn" data-act="run">Run</button><button class="tbtn" data-act="crouch">Crouch</button><button class="tbtn big" data-act="interact">E</button><button class="tbtn" data-act="jump">Jump</button></div>
   </div>
   <button id="hint" hidden>Click to look around<small>Mouse to look · W A S D to move</small></button>
 </div>
@@ -5398,7 +5398,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     open('company');
   }
   function controlsTable() {
-    const rows = [['W A S D', 'Move'], ['Mouse', 'Look around'], ['Shift', 'Walk faster'], ['Space', 'Jump'], ['E', 'Interact'], ['P', 'Screen pattern'], ['N', 'Animation speed'],['V', 'Product animation'], ['C', 'First / third person'], ['M', 'Map'], ['Tab', 'Journal'], ['Esc', 'Pause menu']];
+    const rows = [['W A S D', 'Move'], ['Mouse', 'Look around'], ['Shift', 'Walk faster'], ['Ctrl', 'Crouch'], ['Space', 'Jump'], ['E', 'Interact'], ['P', 'Screen pattern'], ['N', 'Animation speed'],['V', 'Product animation'], ['C', 'First / third person'], ['M', 'Map'], ['Tab', 'Journal'], ['Esc', 'Pause menu']];
     return `<table class="controls"><tbody>${rows.map(r => `<tr><td>${r[0].split(' ').map(k => `<kbd class="kbd">${k}</kbd>`).join(' ')}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table>`;
   }
 
@@ -6128,7 +6128,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
   }
   const T = THREE, UI = () => CFT.UI, A = CFT.Audio;
   const SAVE_KEY = 'cft-kinetic-museum-v3-27';
-  const EYE = 1.65, WALK = 3.4, RUN = 6.4, GRAV = 15, JUMP_V = 5.2;
+  const EYE = 1.65, CROUCH_EYE = 1.05, WALK = 3.4, RUN = 6.4, CROUCH_WALK = 1.9, CROUCH_RUN = 3.0, GRAV = 15, JUMP_V = 5.2;
   const EX = CFT.EXHIBITS, N = EX.length, REQ = [], BONUS = [];
   EX.forEach((e, i) => (e.bonus ? BONUS : REQ).push(i));
   const reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -6163,7 +6163,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
     // Start inside the atrium so the first playable view immediately presents the five-level museum.
-    player: { pos: new T.Vector3(0, 0, 10), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
+    player: { pos: new T.Vector3(0, 0, 10), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0, crouched: false },
     camY: EYE, zone: { id: 'plaza', name: 'Entrance Plaza' }, focus: null, REQ, BONUS, usePost: false
   };
 
@@ -6552,7 +6552,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     }
     if (UI().anyOpen()) { if (UI().onKey(e)) e.preventDefault(); return; }
     if (G.phase !== 'play') return;
-    if (e.code === 'Space') e.preventDefault();
+    if (e.code === 'Space' || e.code === 'ControlLeft' || e.code === 'ControlRight') e.preventDefault();
     if (e.repeat && ['KeyE', 'KeyM', 'KeyP', 'KeyN', 'KeyV', 'KeyC', 'Tab', 'Escape', 'Space'].includes(e.code)) return;
     keys.add(e.code);
     if (e.code === 'KeyE') interact();
@@ -6571,7 +6571,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
   // ---------------------------------------------------------------- Touch controls (iPhone, iPad, Android)
   // A joystick on the left moves (pushed all the way it walks faster), a drag anywhere else turns the view, and
   // buttons stand in for E, Space, Shift, M, Tab and Esc. No pointer lock on touch: the view turns by dragging.
-  const touch = { x: 0, y: 0, active: false, run: false };
+  const touch = { x: 0, y: 0, active: false, run: false, crouch: false };
   G.touch = touch;
   // Phones and tablets (a coarse pointer, or touch with no mouse); a laptop with a touchscreen keeps mouse controls.
   const mq = q => !!(window.matchMedia && matchMedia(q).matches);
@@ -6613,6 +6613,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
       interact: () => interact(),
       jump: () => { if (G.player.onGround) { G.player.vy = JUMP_V; G.player.onGround = false; } },
       run: b => { touch.run = !touch.run; b.classList.toggle('on', touch.run); },
+      crouch: b => { touch.crouch = !touch.crouch; b.classList.toggle('on', touch.crouch); },
       map: () => UI().openMap(), journal: () => UI().openJournal(), pause: () => UI().openPause()
     };
     document.querySelectorAll('#touch-ui [data-act]').forEach(b => b.addEventListener('click', e => {
@@ -6620,7 +6621,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     }));
     $('prompt').addEventListener('click', () => { if (G.phase === 'play') interact(); });
     // Leaving play (menus, films) lets go of the joystick.
-    const reset = () => { joyId = null; lookId = null; touch.active = false; touch.x = touch.y = 0; knob.style.transform = ''; };
+    const reset = () => { joyId = null; lookId = null; touch.active = false; touch.run = false; touch.crouch = false; touch.x = touch.y = 0; knob.style.transform = ''; document.querySelectorAll('#touch-ui .tbtn.on').forEach(b => b.classList.remove('on')); };
     new MutationObserver(() => { if (document.body.dataset.phase !== 'play') reset(); }).observe(document.body, { attributes: true, attributeFilter: ['data-phase'] });
   }
 
@@ -6640,8 +6641,10 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
       const m = Math.min(1, Math.hypot(G.touch.x, G.touch.y));
       if (m > 0.12) { fx += G.touch.x; fz -= G.touch.y; pace = m; stickRun = m > 0.92; }
     }
-    const running = keys.has('ShiftLeft') || keys.has('ShiftRight') || (G.touch && G.touch.run) || stickRun;
-    const len = Math.hypot(fx, fz), speed = running ? RUN : WALK;
+    const crouching = keys.has('ControlLeft') || keys.has('ControlRight') || (G.touch && G.touch.crouch);
+    p.crouched = !!crouching;
+    const running = !crouching && (keys.has('ShiftLeft') || keys.has('ShiftRight') || (G.touch && G.touch.run) || stickRun);
+    const len = Math.hypot(fx, fz), speed = crouching ? (running ? CROUCH_RUN : CROUCH_WALK) : (running ? RUN : WALK);
     const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw);
     let tx = 0, tz = 0;
     if (len) { tx = (-sy * fz + cy * fx) / len * speed * pace; tz = (-cy * fz - sy * fx) / len * speed * pace; }
@@ -6666,7 +6669,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
       if (stepAcc > (speed === RUN ? 2.1 : 1.6)) { stepAcc = 0; A.step(); }
       bobPhase += moved * 3.4;
     }
-    const target = reduceMotion ? 0 : Math.sin(bobPhase) * 0.035 * Math.min(1, moved / dt / WALK);
+    const target = reduceMotion ? 0 : Math.sin(bobPhase) * (p.crouched ? 0.018 : 0.035) * Math.min(1, moved / dt / WALK);
     bob += (target - bob) * Math.min(1, dt * 12);
     if (P().distance >= 750) G.award('walker');
   }
@@ -6675,7 +6678,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
   const TP_DIST = 3.2, TP_SIDE = 0.45;
   let tpDist = TP_DIST;
   function applyCamera(dt) {
-    const p = G.player, target = p.pos.y + EYE + bob;
+    const p = G.player, target = p.pos.y + (p.crouched ? CROUCH_EYE : EYE) + bob;
     G.camY += (target - G.camY) * (p.onGround ? Math.min(1, dt * 14) : 1);
     if (G.state.settings.view !== 'third' || G.phase === 'cinematic') {
       camera.position.set(p.pos.x, G.camY, p.pos.z);
@@ -6913,7 +6916,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     placePlayer(0, G.world.FLOOR, 10, 0, 0.12);
     G.setPhase('play');
     $('hud').hidden = false;
-    UI().toast('Walk inside', 'W A S D to move, mouse to look, Shift to walk faster. The doors open as you approach.');
+    UI().toast('Walk inside', 'W A S D to move, Shift to sprint, Ctrl to crouch, mouse to look. The doors open as you approach.');
   }
   canvas.addEventListener('click', () => { if (G.phase === 'cinematic') endCinematic(); else if (G.phase === 'showcase') endShowcase(); });
   $('cine').addEventListener('click', () => { if (G.phase === 'cinematic') endCinematic(); else if (G.phase === 'showcase') endShowcase(); });
