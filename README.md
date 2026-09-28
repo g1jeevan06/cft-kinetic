@@ -22,3 +22,5 @@ Source files for Aurora, Nebula and the telescopic display were located but need
 Run `node check-collection.cjs` to check scripts, catalogue, hall layout, drawing assets and obstacle routing. Preview with `python -m http.server 8765 --bind 127.0.0.1` from this directory.
 
 The complete screen-to-screen experience is documented in [GAME_FLOW.md](GAME_FLOW.md), including the reference screen names, controls, and return paths.
+
+The supplied product brief is checked against the current implementation in [SPEC_AUDIT.md](SPEC_AUDIT.md), with the remaining production gaps and recommended order.
