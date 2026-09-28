@@ -4339,7 +4339,9 @@ CFT.loadModels = onProgress => {
       ex.sourceSize = Object.assign({},ex.size);
       // Fit every source to the same visual bay envelope. Smaller exports are enlarged so they do not
       // disappear on their plinth, while wide/tall exports keep their original proportions and stay inside it.
-      const fit = r.central ? Math.min(3,3.8/ex.size.w,3.8/ex.size.d,7.8/ex.size.h,1.8/ex.radius) : Math.min(2.2,2.4/ex.size.w,2.4/ex.size.d,2.65/ex.size.h,1.25/ex.radius);
+// Scale each installation to read clearly inside its bay while preserving its source proportions.
+// The larger caps and bay envelopes prevent small exports from appearing undersized without overflow.
+const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2.0/ex.radius) : Math.min(4.0,3.4/ex.size.w,3.4/ex.size.d,3.6/ex.size.h,1.55/ex.radius);
       const modelGroup=ex.group; modelGroup.scale.multiplyScalar(fit);
       ex.group=new T.Group();ex.group.add(modelGroup);
       ex.size={w:ex.size.w*fit,h:ex.size.h*fit,d:ex.size.d*fit};ex.radius*=fit;ex.displayScale=fit;
