@@ -1,7 +1,7 @@
 // Reference-inspired double-height atrium. Dimensions are in metres.
 (function () {
   CFT.buildReferenceAtrium = function (A,M,D,scene,world,T,Geo,FLOOR,TOP,canvasTexture,sign,FONT,plant) {
-    const upper=FLOOR+4.4, crown=FLOOR+8.8, roof=FLOOR+17;
+    const basement=FLOOR-4.4, upper=FLOOR+4.4, crown=FLOOR+8.8, rooftop=FLOOR+13.2, roof=FLOOR+17;
     const metal=new T.MeshStandardMaterial({color:0x111B24,roughness:0.22,metalness:0.9});
     const stone=new T.MeshStandardMaterial({color:0x1D2B36,roughness:0.24,metalness:0.62});
     const dark=new T.MeshStandardMaterial({color:0x08121B,roughness:0.38,metalness:0.48});
@@ -18,6 +18,16 @@
       for(let i=0;i<=n;i++)box(metal,0.065,1.14,0.065,x1+(x2-x1)*i/n,y+0.57,z1+(z2-z1)*i/n);
     };
     box(dark,26.3,0.025,26.3,0,FLOOR+0.015,0);
+    // A true service basement deck below the public galleries.
+    box(dark,26.3,0.025,26.3,0,basement+0.015,0);
+    box(metal,25.6,0.08,0.18,0,basement+0.12,-12.8);
+    box(blue,25.4,0.035,0.05,0,basement+0.16,-12.55);
+    // Rooftop visitor deck with a chamfered ring, seating edge and a central kinetic marker.
+    box(dark,26.3,0.025,26.3,0,rooftop+0.015,0);
+    [9.5,10.8,12.1].forEach((r,i)=>A.add(new T.RingGeometry(r,r+0.12,8),i===1?warm:metal,0,rooftop+0.08+i*0.03,0));
+    A.add(new T.CylinderGeometry(3.8,4.1,0.18,64),metal,0,rooftop+0.1,0);
+    A.add(new T.TorusGeometry(3.85,0.08,10,96),warm,0,rooftop+0.22,0,0,Math.PI/2);
+    for(const x of [-9.5,9.5])for(const z of [-9.5,9.5]) plant(A,M,x,z,rooftop);
     for(let x=-12;x<=12;x+=2)for(let z=-12;z<=12;z+=2)
       box(stone,1.96,0.015,1.96,x,FLOOR+0.032,z);
     // U-shaped upper gallery, open at the entrance.
@@ -99,6 +109,21 @@
     box(metal,10.8,0.3,3.2,0,crown-0.15,-11.4);
     box(stone,10.8,0.04,3.2,0,crown+0.02,-11.4);
     rail(-5.4,-9.8,5.4,-9.8,crown);rail(-12.85,-12.85,12.85,-12.85,crown);
+    // Side service stairs connect the public galleries to the real basement and rooftop decks.
+    [-1,1].forEach(s=>{
+      for(let i=0;i<16;i++){
+        const t=(i+1)/16, y=basement+t*4.4, z=-9.2-t*3.2;
+        box(metal,1.9,0.22,0.22,s*10.4,y-0.11,z);
+        box(warm,1.65,0.025,0.03,s*10.4,y+0.01,z+0.11);
+      }
+      for(let i=0;i<16;i++){
+        const t=(i+1)/16, y=top+t*4.4, z=-9.2-t*3.2;
+        box(metal,1.9,0.22,0.22,s*10.4,y-0.11,z);
+        box(blue,1.65,0.025,0.03,s*10.4,y+0.01,z+0.11);
+      }
+      rail(s*9.3,-9.2,s*9.3,-12.5,basement);rail(s*11.5,-9.2,s*11.5,-12.5,basement);
+      rail(s*9.3,-9.2,s*9.3,-12.5,top);rail(s*11.5,-9.2,s*11.5,-12.5,top);
+    });
     box(warm,25.6,0.05,0.08,0,crown-0.14,-9.8);
     // Roof: octagonal luminous coffers, a blue glass skylight and structural grid.
     [-10.8,10.8].forEach(v=>{
@@ -218,7 +243,14 @@
   };
   // Stairs are solid; balconies can be walked underneath at ground level.
   CFT.atriumHeight = function(x,z,y,floor) {
-    const ax=Math.abs(x),mid=floor+4.4,top=floor+8.8;
+    const ax=Math.abs(x),basement=floor-4.4,mid=floor+4.4,top=floor+8.8,rooftop=floor+13.2;
+    // Basement and rooftop are real walkable decks. Their side stairs are handled as ramps below.
+    if(ax>9.2 && ax<11.6 && z>-12.6 && z<-9.2 && y>=basement-0.38 && y<=floor+0.38)
+      return basement + Math.max(0,Math.min(1,(-z-9.2)/3.4))*4.4;
+    if(ax>9.2 && ax<11.6 && z>-12.6 && z<-9.2 && y>=top-0.38 && y<=rooftop+0.42)
+      return top + Math.max(0,Math.min(1,(-z-9.2)/3.4))*4.4;
+    if(y>=basement-0.38 && y<floor-0.38)return basement;
+    if(y>=rooftop-0.38 && y<rooftop+0.42)return rooftop;
     if(y>=mid-0.38 && Math.hypot(x,z)>3.08 && Math.hypot(x,z)<3.7 && Math.abs(z)>1.1)return null;
     // The reception is below a middle-level podium and its two connecting bridges.
     if(y>=mid-0.38 && Math.hypot(x,z)<3.45)return mid;

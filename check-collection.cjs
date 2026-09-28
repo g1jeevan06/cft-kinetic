@@ -45,15 +45,20 @@ rooms.forEach((r,i) => {
   assert.equal(r.id,c.EXHIBITS[i].id);
   assert(r.x0>=bounds.x0 && r.x1<=bounds.x1 && r.z0>=bounds.z0 && r.z1<=bounds.z1);
   rooms.slice(i+1).filter(s=>s.level===r.level).forEach(s => assert(!(r.x0<s.x1 && r.x1>s.x0 && r.z0<s.z1 && r.z1>s.z0),'overlapping halls'));
-  if(r.level){
+  if(r.level>1){
     const x=(r.x0+r.x1)/2+(r.face==='+x'?2.2:r.face==='-x'?-2.2:0);
     const z=(r.z0+r.z1)/2+(r.central?3.2:r.face==='+z'?1.8:0),y=0.75+r.elevation;
-    assert.equal(c.atriumHeight(x/1.6,z/1.6,y,0.75),y,'upper exhibit landing '+r.id);
+    assert.equal(c.floorLevel(c.atriumHeight(x/1.6,z/1.6,y,0.75),0.75),r.level,'upper exhibit landing '+r.id);
   }
 });
-for(const level of [0,1,2])assert.equal(rooms.filter(r=>r.level===level).length,9);
+for(const level of [1,2,3])assert.equal(rooms.filter(r=>r.level===level).length,9);
 assert(rooms[0].central);
-assert.equal(rooms[5].level,2);assert.equal(rooms[14].level,1);assert.equal(rooms[22].level,0);
+assert.equal(rooms[5].level,3);assert.equal(rooms[14].level,2);assert.equal(rooms[22].level,1);
+assert.equal(JSON.stringify(c.FLOOR_NAMES),JSON.stringify(['Basement','Floor 1 Gallery','Floor 2 Gallery','Upper Gallery','Rooftop']));
+assert.equal(c.floorLevel(-3.65,0.75),0,'basement floor index');
+assert.equal(c.floorLevel(13.95,0.75),4,'rooftop floor index');
+assert(Math.abs(c.atriumHeight(0,0,-3.65,0.75)+3.65)<0.001,'basement deck');
+assert(Math.abs(c.atriumHeight(0,0,13.95,0.75)-13.95)<0.001,'rooftop deck');
 const galleryWorld={FLOOR:0.75,HALL:c.LAYOUT.promenade,floorAt(x,z,y=0.75){
   const h=c.atriumHeight(x/1.6,z/1.6,y,0.75);
   if(h===null)return null;
@@ -61,10 +66,14 @@ const galleryWorld={FLOOR:0.75,HALL:c.LAYOUT.promenade,floorAt(x,z,y=0.75){
   if(y<4.5&&Math.hypot(x,z)<5.7)return null;
   return h===undefined?0.75:h;
 }};
-for(const r of rooms.filter(r=>r.level)){
+for(const r of rooms.filter(r=>r.level>1)){
   const to={x:(r.x0+r.x1)/2+(r.face==='+x'?2.2:r.face==='-x'?-2.2:0),z:(r.z0+r.z1)/2+(r.central?3.2:r.face==='+z'?1.8:0),y:0.75+r.elevation};
   assert(c.galleryRoute({x:0,z:20,y:0.75},to,galleryWorld).length>2,'stair route to '+r.id);
   assert(c.galleryRoute(to,{x:0,z:20,y:0.75},galleryWorld).length>2,'return route from '+r.id);
+}
+for(const y of [-3.65,13.95]){
+  const route=c.galleryRoute({x:0,z:20,y:0.75},{x:10.5,z:-11.5,y},galleryWorld);
+  assert(route.length>2,'route to special level '+y);
 }
 Object.values(c.DRAWING_PAGES).flat().forEach(f => assert(fs.existsSync(path.join(__dirname,f)), f));
 assert(c.activityAvailable(c.EXHIBITS[12],'diagram'));

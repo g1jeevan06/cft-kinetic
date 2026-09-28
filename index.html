@@ -545,7 +545,7 @@
   </div>
   <div class="title-foot">
     <div class="title-controls">
-      <p class="specline"><b>27</b> projects · <b>3</b> gallery tiers · central <b>DNA</b> installation</p>
+      <p class="specline"><b>27</b> projects · <b>5</b> museum levels · central <b>DNA</b> installation</p>
       <p class="specline byline">Game design &amp; build by <b>CFT 3D Team</b></p>
       <div class="eyebrow">Controls</div><div id="controls-title"></div>
       <p class="title-note">Best with a keyboard and mouse. Sound and narration are on — adjust them from the pause menu.</p></div>
@@ -628,7 +628,7 @@
 
 <div id="map" class="overlay modal" hidden role="dialog" aria-labelledby="map-title">
   <div class="sheet map-sheet">
-    <div class="sheet-head"><div><div class="eyebrow">Atrium plan · Select a floor</div><h2 id="map-title">Map</h2></div><div class="sheet-nav"><label>Floor <select id="map-level"><option value="0">Ground gallery</option><option value="1">Middle gallery</option><option value="2">Upper gallery</option></select></label><button class="close-btn" id="map-lobby">Lobby</button><button class="close-btn" data-home>&#8962; Home</button><button class="close-btn" id="map-close">&#8592; Back &middot; M</button></div></div>
+      <div class="sheet-head"><div><div class="eyebrow">Museum plan · Select a floor</div><h2 id="map-title">Map</h2></div><div class="sheet-nav"><label>Floor <select id="map-level"><option value="0">Basement</option><option value="1">Floor 1 gallery</option><option value="2">Floor 2 gallery</option><option value="3">Upper gallery</option><option value="4">Rooftop</option></select></label><button class="close-btn" id="map-lobby">Lobby</button><button class="close-btn" data-home>&#8962; Home</button><button class="close-btn" id="map-close">&#8592; Back &middot; M</button></div></div>
     <canvas id="map-canvas" aria-label="Floor plan of the building. Click a hall to jump there."></canvas>
     <aside class="map-aside">
       <figure class="map-drawing" id="map-drawing" hidden><img alt=""><figcaption></figcaption></figure>
@@ -1003,7 +1003,7 @@ CFT.EXHIBITS = [
 CFT.ROUTE = ['dna', 'sliding-dna', 'hmrs', 'c-hmrs', 'tri-helix', 'kuka-bot', 'nova-bot', 'hexora', 'triblock'];
 
 CFT.NARRATION = {
-  welcome: 'Welcome to CFT Kinetic. Nine installations are waiting to show you how motion becomes both art and engineering, with three more in the expansion halls. Follow the guided tour, explore freely, or use the map to jump straight to any hall.',
+  welcome: 'Welcome to CFT Kinetic. Explore twenty-seven installations across the basement, gallery levels and rooftop. Follow the guided tour, explore freely, or use the map to jump straight to any hall.',
   complete: 'You have visited all nine installations. Return to the central lobby to see your tour summary.',
   summary: 'Thank you for visiting CFT Kinetic.'
 };
@@ -1022,7 +1022,7 @@ CFT.ACHIEVEMENTS = [
 
 CFT.MUSEUM_INFO = {
   about: 'CFT Kinetic showcases kinetic technologies, robotic systems and motion-based installations. There are no enemies, no timers and no way to fail — just exhibits to discover at your own pace.',
-  layout: 'A circular central lobby sits inside an exhibition promenade. Nine tour halls and three expansion halls line the outer walls, with four lounges along the way.',
+  layout: 'A circular central lobby sits inside an exhibition promenade with a service basement, three public galleries and a walkable rooftop deck.',
   dimensions: [
     ['Overall building', '80.00 × 60.00 m'], ['Overall height', '8.00 m'], ['Ceiling height', '7.00 m'],
     ['Central lobby', 'Ø 25.00 m rotunda, 16 columns'], ['Exhibition halls', '11.5 – 14.0 m × 11.7 – 12.0 m'],
@@ -4316,9 +4316,11 @@ CFT.loadModels = onProgress => {
       rf.rotation.x = -Math.PI / 2; rf.position.set(0, FLOOR, (PAV.z1 + BLD.z0) / 2);
       scene.add(rf); world.reflector = rf;
     }
-    [[0, (BLD.z0 + BLD.z1) / 2, BLD.x1 - BLD.x0 - 0.6, BLD.z1 - BLD.z0 - 0.6], [0, 35.35, 10, 11.3]].forEach(([x, z, w, d]) => {
+    [[0, (BLD.z0 + BLD.z1) / 2, BLD.x1 - BLD.x0 - 0.6, BLD.z1 - BLD.z0 - 0.6, FLOOR], [0, 35.35, 10, 11.3, FLOOR],
+      [0, (BLD.z0 + BLD.z1) / 2, BLD.x1 - BLD.x0 - 0.6, BLD.z1 - BLD.z0 - 0.6, FLOOR - 4.4],
+      [0, (BLD.z0 + BLD.z1) / 2, BLD.x1 - BLD.x0 - 0.6, BLD.z1 - BLD.z0 - 0.6, FLOOR + 13.2]].forEach(([x, z, w, d, y]) => {
       const f = new T.Mesh(Geo.planeUV(w, d, 2.4), M.floor);
-      f.rotation.x = -Math.PI / 2; f.position.set(x, FLOOR + 0.005, z); f.renderOrder = 1;
+      f.rotation.x = -Math.PI / 2; f.position.set(x, y + 0.005, z); f.renderOrder = 1;
       f.receiveShadow = true;
       scene.add(f);
     });
@@ -4540,11 +4542,11 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
       const atrium = CFT.atriumHeight(x/CFT.ATRIUM_SCALE,z/CFT.ATRIUM_SCALE,y,FLOOR);
       if (collide(x,z,y)) return null;
       if (atrium !== undefined) return atrium;
-      if (inRect(x, z, HALL, PR)) return FLOOR;
-      if (x > -5 + PR && x < 5 - PR && z > HALL.z1 - 1 && z < DOOR_Z - 0.25) return FLOOR;
+      if (inRect(x, z, HALL, PR)) return FLOOR + (CFT.floorLevel(y,FLOOR)-1)*4.4;
+      if (x > -5 + PR && x < 5 - PR && z > HALL.z1 - 1 && z < DOOR_Z - 0.25) return FLOOR + (CFT.floorLevel(y,FLOOR)-1)*4.4;
       for (const r of ROOMS) {
         if (!r.enterable) continue;
-        if (inRect(x, z, r, PR) || inRect(x, z, r.doorRect, 0)) return FLOOR;
+        if (inRect(x, z, r, PR) || inRect(x, z, r.doorRect, 0)) return FLOOR + (r.level-1)*4.4;
       }
       if (world.doors.open > 0.8 && x > -4.4 && x < 4.4 && z >= DOOR_Z - 0.3 && z <= PORCH.z0 + 0.4) return FLOOR;
       if (x > PORCH.x0 + 0.1 && x < PORCH.x1 - 0.1 && z > PORCH.z0 && z < PORCH.z1) return FLOOR;
@@ -4712,6 +4714,14 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     c.fillStyle = P.bld; c.fillRect(-5, PAV.z0 - 0.3, 10, 11.3);
     c.strokeRect(PAV.x0, PAV.z0, 20, 11);
     c.fillStyle = P.hall; c.fillRect(HALL.x0, HALL.z0, HALL.x1-HALL.x0, HALL.z1-HALL.z0);
+    if (o.level === 0 || o.level === 4) {
+      c.fillStyle = P.room; c.strokeStyle = ink; c.lineWidth = 0.35;
+      [[-16,-16,8,6],[-4,-16,8,6],[8,-16,8,6],[-16,10,8,6],[-4,10,8,6],[8,10,8,6]].forEach(([x,z,w,d])=>{c.fillRect(x,z,w,d);c.strokeRect(x,z,w,d);});
+      c.fillStyle = P.info; c.font = `2.2px ${FONT.mono}`; c.textAlign = 'center';
+      c.fillText(o.level === 0 ? 'BASEMENT · SERVICE / TECH / STORAGE' : 'ROOFTOP · SPECIAL INSTALLATION / SKYLINE VIEW', 0, -1.5);
+      c.font = `1.5px ${FONT.body}`;
+      c.fillText(o.level === 0 ? 'CONTROL ROOM   SERVER   HVAC   WORKSHOP   LOADING' : 'KINETIC RING   GREEN TERRACE   CAFE / LOUNGE   SEATING', 0, 1.2);
+    }
     world.rooms.filter(r=>r.level===(o.level||0)).forEach(r => {
       const ex = r.exhibit, i = ex ? ex.index : -1;
       c.fillStyle = r.type ? P.svc : (o.hover === i ? P.hover : (o.visited && o.visited[i] ? P.seen : P.room));
@@ -5150,7 +5160,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     mapState.level=CFT.floorLevel(G().player.pos.y,G().world.FLOOR);
     $('map-level').value=String(mapState.level);
     $('map-level').onchange=()=>{mapState.level=+$('map-level').value;drawMapNow();};
-    $('map-list').innerHTML = [0,1,2].map(level => '<li class="list-label">'+CFT.FLOOR_NAMES[level]+'</li>'+CFT.EXHIBITS.filter(e=>e.floorLevel===level).map(e=>hallRow(e.id)).join('')).join('');
+    $('map-list').innerHTML = [0,1,2,3,4].map(level => '<li class="list-label">'+CFT.FLOOR_NAMES[level]+'</li>'+CFT.EXHIBITS.filter(e=>e.floorLevel===level).map(e=>hallRow(e.id)).join('')).join('');
     $('map-list').querySelectorAll('.hall-row').forEach(b => {
       b.onclick = () => jump(+b.dataset.i);
       b.onmouseenter = () => { mapState.hover = +b.dataset.i; mapPreview(mapState.hover); };
@@ -6152,7 +6162,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
       settings: Object.assign({ sensitivity: 1, volume: 0.7, voice: true, invertY: false, quality: 'high', qualityManual: false, sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true, view: 'first', guide: true, guideColor: 'yellow', guideRig: false }, saved && saved.settings, saved && saved.settings && !saved.settings.sunsetSky ? { sky: 'sunset', seaSky: true, nightSky: true, sunsetSky: true } : null, { guide: false })
     },
     phase: 'loading', locked: false, dragLook: false, lockWorked: false, lockLostAt: 0,
-    // Start inside the atrium so the first playable view immediately presents the three-tier museum.
+    // Start inside the atrium so the first playable view immediately presents the five-level museum.
     player: { pos: new T.Vector3(0, 0, 10), vx: 0, vz: 0, vy: 0, onGround: true, yaw: 0, pitch: 0 },
     camY: EYE, zone: { id: 'plaza', name: 'Entrance Plaza' }, focus: null, REQ, BONUS, usePost: false
   };
@@ -6872,7 +6882,7 @@ const fit = r.central ? Math.min(3.2,4.2/ex.size.w,4.2/ex.size.d,8.5/ex.size.h,2
     t: 0, dur: 11,
     path: new T.CatmullRomCurve3([new T.Vector3(28, 16, 112), new T.Vector3(13, 7, 84), new T.Vector3(3, 2.6, 62), new T.Vector3(0, EYE, 54)]),
     look: new T.CatmullRomCurve3([new T.Vector3(0, 6, 41), new T.Vector3(0, 4.8, 41), new T.Vector3(0, 3.4, 40), new T.Vector3(0, EYE + 0.4, 40)]),
-    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Twenty-seven projects. Three gallery tiers. One kinetic museum.'], [7.4, 'The doors are opening. Welcome in.']],
+    captions: [[0.3, 'CFT Kinetic'], [3.8, 'Twenty-seven projects. Five museum levels. One kinetic museum.'], [7.4, 'The doors are opening. Welcome in.']],
     shown: -1
   };
   const tmpLook = new T.Vector3();

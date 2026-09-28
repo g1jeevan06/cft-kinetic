@@ -49,7 +49,7 @@ flowchart TD
 | `INSTALLATION DETAILS PAGE` | Technical/specification tab | Read, switch tabs | Exhibit panel |
 | `GALLERY VIEWER` | Drawings and media | Open image, close lightbox | Exhibit panel |
 | `VIDEO PLAYER` | Project/showreel media | Play or open external fallback | Exhibit panel |
-| `MUSEUM MAP` | Three-floor directory | Select floor or jump to a hall | HUD |
+| `MUSEUM MAP` | Five-level directory | Select floor or jump to a hall | HUD |
 | `ACHIEVEMENT SCREEN` | Journal progress | Review unlocked goals | HUD/summary |
 | `PAUSE MENU` | Paused game | Resume, map, journal, settings, exit | HUD |
 | `SETTINGS` | Input/audio/graphics | Change a setting | Pause |
@@ -59,7 +59,7 @@ flowchart TD
 
 ## Current implementation notes
 
-- `M` opens the three-floor map; the floor selector groups all 27 halls by gallery tier.
+- `M` opens the five-level map; the floor selector exposes Basement, Floor 1, Floor 2, Upper and Rooftop, while grouping all 27 halls by gallery tier.
 - `Tab` opens the journal and achievement progress.
 - `Esc` opens pause; the pause menu contains settings, map, journal, home, and exit.
 - `E` opens the focused exhibit, reception, or floor-map interaction.

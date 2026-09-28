@@ -7,7 +7,7 @@ Craftech360's kinetic installation museum, playable in the browser (desktop, iPh
 
 ## 27-project environment rebuild
 
-The central lobby follows the latest CFT museum reference: three gallery tiers, twin stair flights, dark numbered exhibit bays with gold trim, glass railings, a central raised DNA display, reception below it, suspended light rings, palms and a blue floor map. Decorative helix lighting surrounds the existing DNA model. The elevator remains decorative. Use Map → Lobby to visit, or select Ground, Middle or Upper from the map. The floor map is also interactive with E.
+The central lobby follows the latest CFT museum reference: a true basement, three gallery tiers, and a walkable rooftop, with twin gallery stairs plus side service stairs, dark numbered exhibit bays with gold trim, glass railings, a central raised DNA display, reception below it, suspended light rings, palms and a blue floor map. The elevator remains decorative. Use Map → Lobby to visit, or select Basement, Floor 1, Floor 2, Upper, or Rooftop from the map. The floor map is also interactive with E.
 
 All 27 projects retain their original numbers, with positions following the reference: ground 02–05 and 23–27; middle 15–22 and central DNA 01; upper 06–14. The atrium is 42 m across. Models are scaled to the bays while information panels retain full-size dimensions. Guided routes use both stair flights and the bridges to the DNA podium. Progress counts only available activities.
 

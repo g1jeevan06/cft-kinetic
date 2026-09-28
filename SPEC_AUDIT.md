@@ -5,12 +5,12 @@ Compared with the supplied project brief:
 ## Already working
 
 - Playable Three.js/WebGL first-person museum with WASD, mouse, sprint, E interaction, M map, Tab journal and Esc pause.
-- Three-tier atrium with stairs, bridges, elevator display, reception, floor map, railings, exhibit bays and animated installations.
+- Five-level atrium with basement and rooftop decks, stairs, bridges, elevator display, reception, floor map, railings, exhibit bays and animated installations.
 - Central DNA kinetic display with helix motion, suspended points, lighting and a raised podium.
 - GLTF/GLB model loading, lazy model pass, animated screen content, model reservations and source-size metadata.
 - Exhibit panels with overview, technology, diagrams, gallery, video and specifications tabs.
 - Gallery thumbnails/lightbox, live demonstration video canvas, chapters and media controls.
-- Three-floor map with markers, current position, routing, floor selection and jump-to-hall.
+- Five-level map with markers, current position, routing, floor selection and jump-to-hall.
 - HUD compass, objective, current zone, interaction prompt, progress and minimap.
 - Pause menu, settings for volume/voice/invert-Y/quality/sky/third-person/guide, journal, achievements, summary, credits and exit.
 - Responsive touch controls and a reference-style welcome screen with Start Tour and Explore Freely.
@@ -18,7 +18,7 @@ Compared with the supplied project brief:
 
 ## Still missing or partial
 
-- The brief names a separate Basement and Rooftop; the current map has Ground, Middle and Upper galleries.
+- Basement and Rooftop are now true walkable levels. The map exposes Basement, Floor 1, Floor 2, Upper and Rooftop, with service and visitor deck geometry plus side stair connections.
 - CTRL crouch is not implemented yet; C currently toggles first/third-person view.
 - Gamepad input and WebXR/VR input are not implemented.
 - AR view, share action, playlist/video-quality controls, captions and presentation mode are not implemented.
